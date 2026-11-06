@@ -17,8 +17,10 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
-const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
+// 복사·붙여넣기 중에 섞여 들어간 줄바꿈, 공백, 따옴표를 지웁니다.
+const cleanEnv = (v) => String(v || '').replace(/[\s"'`]+/g, '');
+const SUPABASE_URL = cleanEnv(process.env.SUPABASE_URL).replace(/\/+$/, '');
+const SUPABASE_KEY = cleanEnv(process.env.SUPABASE_SERVICE_KEY);
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_KEY);
 const STATE_ID = process.env.STATE_ID || 'main';
 
@@ -85,10 +87,29 @@ const supabaseHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+// 오류 메시지에 키가 찍히지 않도록 fetch 오류를 감쌉니다.
+async function supabaseFetch(url, options) {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    const reason = /header/i.test(String(err && err.message)) ? '키에 쓸 수 없는 문자가 들어 있어요. 키를 다시 복사해 넣어 주세요' : '주소에 연결하지 못했어요';
+    throw new Error(`Supabase 요청 실패: ${reason}`);
+  }
+}
+
 async function loadDb() {
   if (USE_SUPABASE) {
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(SUPABASE_URL)) {
+      throw new Error('SUPABASE_URL은 https://xxxx.supabase.co 형태여야 해요');
+    }
+    if (!/^[\x21-\x7e]+$/.test(SUPABASE_KEY)) {
+      throw new Error('SUPABASE_SERVICE_KEY에 영문·숫자가 아닌 문자가 섞여 있어요. 키를 다시 복사해 넣어 주세요');
+    }
+    if (SUPABASE_KEY.startsWith('sb_publishable_')) {
+      throw new Error('Publishable 키가 들어가 있어요. Secret 키(sb_secret_…)를 넣어 주세요');
+    }
     // 읽기에 실패하면 서버를 시작하지 않습니다. 빈 데이터로 덮어써서 기록을 잃는 일을 막기 위해서예요.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.${encodeURIComponent(STATE_ID)}&select=data`, {
+    const res = await supabaseFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.${encodeURIComponent(STATE_ID)}&select=data`, {
       headers: supabaseHeaders(),
     });
     if (!res.ok) throw new Error(`Supabase에서 데이터를 읽지 못했어요 (${res.status}): ${await res.text()}`);
@@ -109,7 +130,7 @@ async function loadDb() {
 
 async function writeState(json) {
   if (USE_SUPABASE) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`, {
+    const res = await supabaseFetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`, {
       method: 'POST',
       headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: `{"id":${JSON.stringify(STATE_ID)},"updated_at":"${new Date().toISOString()}","data":${json}}`,
