@@ -1,0 +1,13 @@
+{
+  "name": "godsaeng-game",
+  "version": "1.0.0",
+  "description": "갓생게임 — 할 일 목록을 게임처럼",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

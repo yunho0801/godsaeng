@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>갓생게임 — 할 일을 끝낼 때마다 레벨업</title>
+  <meta name="description" content="할 일 목록을 게임처럼. 일일·주간 퀘스트를 끝내고 경험치를 모아 레벨을 올리세요. 친구와 연속 달성 기록을 겨뤄 보세요.">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="갓생게임">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+
+  <script>
+    /* 화면이 그려지기 전에 설정(테마·강조색·밝기·글자 크기)을 적용해 깜빡임을 막습니다. */
+    (function () {
+      var KEY = 'gs.settings';
+      var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.GS_DEFAULTS = {
+        brightness: 100, theme: 'dark', accent: 'emerald', fontSize: 'md',
+        levelUpFx: true, haptics: true, sortDone: true, reduceMotion: !!reduce
+      };
+      window.GS_ACCENTS = {
+        emerald: { name: '에메랄드', dark: '52 211 153', light: '16 185 129', fgDark: '52 211 153', fgLight: '4 120 87' },
+        amber: { name: '앰버', dark: '251 191 36', light: '245 158 11', fgDark: '251 191 36', fgLight: '180 83 9' },
+        blue: { name: '일렉트릭 블루', dark: '96 165 250', light: '59 130 246', fgDark: '96 165 250', fgLight: '29 78 216' },
+        rose: { name: '딥 로즈', dark: '251 113 133', light: '244 63 94', fgDark: '251 113 133', fgLight: '190 18 60' }
+      };
+      window.gsLoadSettings = function () {
+        try { return Object.assign({}, GS_DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+        catch (e) { return Object.assign({}, GS_DEFAULTS); }
+      };
+      window.gsSaveSettings = function (s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+      window.gsResolveTheme = function (s) {
+        if (s.theme !== 'system') return s.theme;
+        return window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      };
+      window.gsApplySettings = function (s) {
+        var root = document.documentElement;
+        var theme = gsResolveTheme(s);
+        var a = GS_ACCENTS[s.accent] || GS_ACCENTS.emerald;
+        root.setAttribute('data-theme', theme);
+        root.style.setProperty('--accent', theme === 'light' ? a.light : a.dark);
+        root.style.setProperty('--accent-fg', theme === 'light' ? a.fgLight : a.fgDark);
+        root.style.setProperty('--fs', { sm: '15px', md: '16px', lg: '17.5px' }[s.fontSize] || '16px');
+        root.style.filter = Number(s.brightness) === 100 ? '' : 'brightness(' + (Number(s.brightness) / 100) + ')';
+        root.setAttribute('data-motion', s.reduceMotion ? 'reduce' : 'full');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#f1f1f3' : '#0a0a0b');
+      };
+      gsApplySettings(gsLoadSettings());
+    })();
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    function cv(name) { return 'rgb(var(' + name + ') / <alpha-value>)'; }
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'Outfit', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+            display: ['Outfit', 'Pretendard', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg: cv('--bg'), surface: cv('--surface'), 'surface-2': cv('--surface-2'),
+            ink: cv('--ink'), 'ink-2': cv('--ink-2'), 'ink-3': cv('--ink-3'),
+            line: cv('--line'), accent: cv('--accent'), 'accent-fg': cv('--accent-fg'),
+            'on-accent': cv('--on-accent'), danger: cv('--danger'),
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    :root { --ease: cubic-bezier(0.16, 1, 0.3, 1); }
+    html[data-theme="dark"] {
+      --bg: 10 10 11; --surface: 22 22 25; --surface-2: 34 34 38;
+      --ink: 244 244 245; --ink-2: 161 161 170; --ink-3: 104 104 114;
+      --line: 255 255 255; --on-accent: 10 10 11; --danger: 251 113 133;
+      --hl: 255 255 255; --hl-a: .07; color-scheme: dark;
+    }
+    html[data-theme="light"] {
+      --bg: 241 241 243; --surface: 255 255 255; --surface-2: 244 244 246;
+      --ink: 24 24 27; --ink-2: 82 82 91; --ink-3: 140 140 150;
+      --line: 24 24 27; --on-accent: 10 10 11; --danger: 225 29 72;
+      --hl: 255 255 255; --hl-a: .9; color-scheme: light;
+    }
+    html { background: rgb(var(--bg)); font-size: var(--fs, 16px); -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Pretendard', 'Outfit', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: rgb(var(--ink)); background: rgb(var(--bg));
+      word-break: keep-all; overflow-wrap: break-word;
+      -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased;
+    }
+    iconify-icon { display: inline-block; width: 1em; height: 1em; flex-shrink: 0; vertical-align: -0.125em; }
+    .font-display { font-family: 'Outfit', 'Pretendard', system-ui, sans-serif; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    ::selection { background: rgb(var(--accent) / .3); }
+    :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; border-radius: 12px; }
+    .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { scrollbar-width: none; }
+
+    button, a, input, .tr {
+      transition: transform .5s var(--ease), opacity .5s var(--ease), background-color .5s var(--ease),
+                  color .5s var(--ease), box-shadow .5s var(--ease), border-color .5s var(--ease);
+    }
+    button:disabled { cursor: not-allowed; }
+
+    /* 배경: 메시 그라데이션 + 그레인 */
+    .mesh { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .orb { position: absolute; border-radius: 9999px; animation: float 11s cubic-bezier(.37, 0, .63, 1) infinite; }
+    .orb.a { width: 520px; height: 520px; top: -220px; right: -180px; background: radial-gradient(circle, rgb(var(--accent) / .16), transparent 65%); }
+    .orb.b { width: 460px; height: 460px; bottom: -200px; left: -200px; background: radial-gradient(circle, rgb(var(--accent) / .08), transparent 65%); animation-delay: -5s; }
+    html[data-theme="light"] .orb.a { background: radial-gradient(circle, rgb(var(--accent) / .14), transparent 65%); }
+    @keyframes float { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -18px, 0); } }
+    .grain {
+      position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: .05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    html[data-theme="light"] .grain { opacity: .035; }
+
+    /* Double-Bezel 카드 */
+    .bezel { padding: 6px; border-radius: 2rem; background: rgb(var(--line) / .035); box-shadow: 0 0 0 1px rgb(var(--line) / .07); }
+    .bezel > .core { border-radius: calc(2rem - 6px); background: rgb(var(--surface)); box-shadow: inset 0 1px 1px rgb(var(--hl) / var(--hl-a)); }
+    .bezel.sm { border-radius: 1.6rem; } .bezel.sm > .core { border-radius: calc(1.6rem - 6px); }
+    html[data-theme="light"] .bezel { box-shadow: 0 0 0 1px rgb(var(--line) / .06), 0 20px 60px -15px rgb(24 24 27 / .08); }
+    .tile { border-radius: 1.4rem; background: rgb(var(--line) / .035); box-shadow: inset 0 0 0 1px rgb(var(--line) / .06); }
+    html[data-theme="light"] .tile { background: rgb(var(--surface)); box-shadow: inset 0 0 0 1px rgb(var(--line) / .06), 0 12px 32px -18px rgb(24 24 27 / .12); }
+
+    /* 글래스 (고정 요소에만 사용) */
+    .glass {
+      background: rgb(var(--surface) / .66);
+      -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
+      border: 1px solid rgb(var(--line) / .09);
+      box-shadow: inset 0 1px 0 rgb(var(--hl) / .08), 0 24px 50px -20px rgb(0 0 0 / .55);
+    }
+    html[data-theme="light"] .glass { background: rgb(255 255 255 / .74); box-shadow: inset 0 1px 0 rgb(255 255 255 / .9), 0 24px 50px -24px rgb(24 24 27 / .25); }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px;
+      font-size: 11px; letter-spacing: .14em; font-weight: 700; text-transform: uppercase;
+      background: rgb(var(--accent) / .1); color: rgb(var(--accent-fg));
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border-radius: 999px;
+      background: rgb(var(--line) / .06); box-shadow: inset 0 0 0 1px rgb(var(--line) / .06); font-size: 14px;
+    }
+
+    /* 버튼 */
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: space-between; gap: 14px;
+      min-height: 56px; padding: 0 8px 0 24px; border-radius: 999px;
+      background: rgb(var(--accent)); color: rgb(var(--on-accent)); font-weight: 700; font-size: 16px;
+    }
+    .btn-primary.center { justify-content: center; padding: 0 24px; }
+    .btn-primary:hover { transform: scale(1.02); box-shadow: 0 0 30px rgb(var(--accent) / .22); }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .45; transform: none; box-shadow: none; }
+    .btn-primary .arrow { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; background: rgb(0 0 0 / .1); transition: transform .5s var(--ease); }
+    .btn-primary:hover .arrow { transform: translateX(4px); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px;
+      border-radius: 999px; background: rgb(var(--line) / .06); box-shadow: inset 0 0 0 1px rgb(var(--line) / .07);
+      font-weight: 600; font-size: 15px; color: rgb(var(--ink));
+    }
+    .btn-ghost:hover { background: rgb(var(--line) / .1); transform: scale(1.02); }
+    .btn-ghost:active { transform: scale(.98); }
+    .btn-ghost:disabled { opacity: .45; transform: none; }
+    .icon-btn { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: rgb(var(--line) / .06); color: rgb(var(--ink-2)); flex-shrink: 0; }
+    .icon-btn:hover { background: rgb(var(--line) / .1); color: rgb(var(--ink)); }
+    .icon-btn:active { transform: scale(.92); }
+
+    /* 세그먼트 */
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: rgb(var(--line) / .06); }
+    .seg-btn { height: 44px; border-radius: 999px; font-weight: 600; font-size: 14px; color: rgb(var(--ink-2)); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .seg-btn.on { background: rgb(var(--ink)); color: rgb(var(--bg)); }
+    .seg-btn:disabled { opacity: .5; }
+    .seg-btn .count { font-family: 'Outfit', sans-serif; font-size: 12px; opacity: .7; }
+    .badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: rgb(var(--danger)); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; font-family: 'Outfit', sans-serif; }
+
+    /* 입력 */
+    .label { display: block; font-size: 13px; font-weight: 600; color: rgb(var(--ink-2)); margin: 0 4px 8px; }
+    .field {
+      width: 100%; height: 56px; padding: 0 18px; border-radius: 1.1rem; font-size: 16px;
+      background: rgb(var(--line) / .05); color: rgb(var(--ink)); box-shadow: inset 0 0 0 1px rgb(var(--line) / .08); outline: none;
+    }
+    .field::placeholder { color: rgb(var(--ink-3)); }
+    .field:focus { box-shadow: inset 0 0 0 2px rgb(var(--accent)); background: rgb(var(--line) / .03); }
+    .err { margin-top: 12px; font-size: 14px; font-weight: 500; color: rgb(var(--danger)); display: flex; gap: 6px; align-items: flex-start; }
+    .hint { margin: 8px 4px 0; font-size: 12.5px; color: rgb(var(--ink-3)); }
+    .opt { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 68px; border-radius: 1.1rem; background: rgb(var(--line) / .05); box-shadow: inset 0 0 0 1px rgb(var(--line) / .06); color: rgb(var(--ink-2)); }
+    .opt.on { background: rgb(var(--accent) / .12); box-shadow: inset 0 0 0 2px rgb(var(--accent)); color: rgb(var(--accent-fg)); }
+    .opt:active { transform: scale(.96); }
+    .step { width: 48px; height: 48px; border-radius: 999px; display: grid; place-items: center; background: rgb(var(--surface)); box-shadow: inset 0 0 0 1px rgb(var(--line) / .08); font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 500; }
+    .step:disabled { opacity: .35; }
+    .step:active { transform: scale(.92); }
+
+    /* 진행 바 */
+    .bar { position: relative; overflow: hidden; border-radius: 999px; background: rgb(var(--line) / .08); height: 10px; }
+    .bar > i { position: absolute; inset: 0; border-radius: inherit; background: rgb(var(--accent)); transform: translateX(calc((var(--p, 0) - 1) * 100%)); transition: transform 1.1s var(--ease); }
+
+    /* 퀘스트 행 */
+    .qrow { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 14px 14px 16px; text-align: left; }
+    .qrow:active { transform: scale(.98); }
+    .check { width: 30px; height: 30px; border-radius: 999px; box-shadow: inset 0 0 0 2px rgb(var(--line) / .2); display: grid; place-items: center; flex-shrink: 0; color: rgb(var(--on-accent)); transition: background-color .5s var(--ease), box-shadow .5s var(--ease), transform .5s var(--ease); }
+    .check svg { transform: scale(.3); opacity: 0; transition: transform .6s var(--ease), opacity .3s var(--ease); }
+    .qrow:hover .check { box-shadow: inset 0 0 0 2px rgb(var(--accent) / .6); }
+    .qrow.done .check { background: rgb(var(--accent)); box-shadow: none; }
+    .qrow.done .check svg { transform: scale(1); opacity: 1; }
+    .qrow.done .q-title { color: rgb(var(--ink-3)); text-decoration: line-through; text-decoration-color: rgb(var(--ink-3) / .7); }
+    .xp-chip { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 12px; padding: 6px 10px; border-radius: 999px; background: rgb(var(--accent) / .12); color: rgb(var(--accent-fg)); white-space: nowrap; }
+    .qrow.done .xp-chip, .xp-chip.muted { background: rgb(var(--line) / .06); color: rgb(var(--ink-3)); }
+    .cat { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0; background: rgb(var(--line) / .06); color: rgb(var(--ink-2)); font-size: 20px; }
+    .seg-dot { height: 8px; border-radius: 99px; background: rgb(var(--line) / .1); transition: background-color .6s var(--ease); }
+    .seg-dot.on { background: rgb(var(--accent)); }
+
+    /* 이번 주 */
+    .day { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: rgb(var(--line) / .06); color: rgb(var(--on-accent)); }
+    .day.perfect { background: rgb(var(--accent)); }
+    .day.today:not(.perfect) { background: transparent; box-shadow: inset 0 0 0 2px rgb(var(--accent)); }
+    .day.future { background: transparent; box-shadow: inset 0 0 0 1px rgb(var(--line) / .1); }
+
+    /* 아바타 */
+    .avatar { display: grid; place-items: center; flex-shrink: 0; border-radius: 999px; font-weight: 700; color: rgb(var(--ink)); background: rgb(var(--surface-2)); box-shadow: inset 0 0 0 1px rgb(var(--line) / .1); }
+    .avatar.me { background: rgb(var(--accent)); color: rgb(var(--on-accent)); box-shadow: none; }
+
+    /* 스위치 · 슬라이더 */
+    .switch { position: relative; width: 52px; height: 32px; border-radius: 999px; background: rgb(var(--line) / .14); flex-shrink: 0; }
+    .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 999px; background: #fafafa; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: transform .5s var(--ease); }
+    .switch[aria-checked="true"] { background: rgb(var(--accent)); }
+    .switch[aria-checked="true"]::after { transform: translateX(20px); }
+    .range { -webkit-appearance: none; appearance: none; width: 100%; height: 32px; background: transparent; --fill: 50%; }
+    .range::-webkit-slider-runnable-track { height: 8px; border-radius: 99px; background: linear-gradient(to right, rgb(var(--accent)) 0 var(--fill), rgb(var(--line) / .12) var(--fill) 100%); }
+    .range::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px; border-radius: 99px; background: #fafafa; box-shadow: 0 2px 8px rgb(0 0 0 / .3); }
+    .range::-moz-range-track { height: 8px; border-radius: 99px; background: rgb(var(--line) / .12); }
+    .range::-moz-range-progress { height: 8px; border-radius: 99px; background: rgb(var(--accent)); }
+    .range::-moz-range-thumb { width: 26px; height: 26px; border: 0; border-radius: 99px; background: #fafafa; }
+    .swatch { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; color: #0a0a0b; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
+    .swatch.on { box-shadow: 0 0 0 2px rgb(var(--surface)), 0 0 0 4px rgb(var(--ink)); }
+    .swatch:active { transform: scale(.9); }
+
+    /* 하단 탭바 */
+    .tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 56px; border-radius: 999px; color: rgb(var(--ink-3)); }
+    .tab.on { color: rgb(var(--ink)); background: rgb(var(--line) / .08); }
+    .tab.on iconify-icon { color: rgb(var(--accent-fg)); }
+    .tab:active { transform: scale(.92); }
+    .tab .dot { position: absolute; top: 9px; left: calc(50% + 6px); width: 8px; height: 8px; border-radius: 99px; background: rgb(var(--danger)); box-shadow: 0 0 0 2px rgb(var(--surface)); }
+
+    /* 등장 효과 */
+    .reveal { opacity: 0; transform: translateY(1.25rem); filter: blur(4px); }
+    .reveal.in { animation: fadeInUp .85s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(1.25rem); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+    /* 시트 · 토스트 · 연출 */
+    .sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0; transition: opacity .5s var(--ease); }
+    .sheet-backdrop.open { opacity: 1; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; max-width: 480px; margin: 0 auto; max-height: 90dvh; overflow-y: auto;
+      border-radius: 2rem 2rem 0 0; background: rgb(var(--surface)); box-shadow: inset 0 1px 0 rgb(var(--hl) / var(--hl-a)), 0 0 0 1px rgb(var(--line) / .08), 0 -30px 60px -30px rgb(0 0 0 / .5);
+      padding-bottom: env(safe-area-inset-bottom); transform: translateY(105%); transition: transform .6s var(--ease); overscroll-behavior: contain;
+    }
+    .sheet.open { transform: none; }
+    .grabber { width: 40px; height: 5px; border-radius: 99px; background: rgb(var(--line) / .15); margin: 10px auto 6px; }
+    #toast-root { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 96px); z-index: 50; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; padding: 0 16px; }
+    .toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: 420px; padding: 12px 18px; border-radius: 999px; background: rgb(var(--ink)); color: rgb(var(--bg)); font-weight: 600; font-size: 14px; box-shadow: 0 20px 40px -12px rgb(0 0 0 / .4); transform: translateY(16px) scale(.96); opacity: 0; transition: transform .5s var(--ease), opacity .4s var(--ease); }
+    .toast.show { transform: none; opacity: 1; }
+    .toast iconify-icon { font-size: 18px; color: rgb(var(--accent)); }
+    html[data-theme="light"] .toast iconify-icon { color: rgb(var(--accent)); }
+    .xp-float { position: fixed; z-index: 50; pointer-events: none; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 18px; color: rgb(var(--accent-fg)); animation: xpFloat 1.2s var(--ease) forwards; }
+    .xp-float.neg { color: rgb(var(--ink-3)); }
+    @keyframes xpFloat { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, -8px) scale(1.08); } 100% { opacity: 0; transform: translate(-50%, -56px) scale(1); } }
+    .lvl-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgb(var(--bg) / .84); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); opacity: 0; transition: opacity .5s var(--ease); }
+    .lvl-overlay.open { opacity: 1; }
+    .lvl-card { position: relative; width: 100%; max-width: 360px; text-align: center; transform: scale(.86) translateY(24px); opacity: 0; transition: transform .9s var(--ease), opacity .6s var(--ease); }
+    .lvl-overlay.open .lvl-card { transform: none; opacity: 1; }
+    .lvl-ring { width: 188px; height: 188px; margin: 0 auto; border-radius: 999px; display: grid; place-items: center; background: radial-gradient(circle, rgb(var(--accent) / .22), transparent 68%); box-shadow: inset 0 0 0 1px rgb(var(--accent) / .35); }
+    .burst { position: absolute; left: 50%; top: 150px; width: 0; height: 0; }
+    .burst i { position: absolute; width: 8px; height: 8px; margin: -4px; border-radius: 99px; background: rgb(var(--accent)); opacity: 0; animation: burst 1.4s var(--ease) forwards; animation-delay: calc(var(--d) + 180ms); }
+    .burst i.sq { width: 6px; height: 11px; border-radius: 2px; background: rgb(var(--ink)); }
+    @keyframes burst { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(.3); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(1); } }
+    .float-chip { animation: float 6s cubic-bezier(.37, 0, .63, 1) infinite; }
+    .pulse-soft { animation: pulseSoft 1.6s cubic-bezier(.37, 0, .63, 1) infinite; }
+    @keyframes pulseSoft { 0%, 100% { opacity: .5; transform: scale(.96); } 50% { opacity: 1; transform: scale(1); } }
+
+    html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+      animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
+    }
+    html[data-motion="reduce"] .reveal { opacity: 1; transform: none; filter: none; }
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+  <div class="mesh" aria-hidden="true"><div class="orb a"></div><div class="orb b"></div></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div id="app" class="relative z-10 mx-auto w-full max-w-[460px] min-h-[100dvh] px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-[calc(env(safe-area-inset-bottom)+8.5rem)]">
+    <header id="topbar"></header>
+    <main id="view" class="break-keep"></main>
+  </div>
+
+  <nav id="tabbar" aria-label="주요 메뉴"
+       class="glass fixed z-40 left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+12px)] w-[calc(100%-24px)] max-w-[436px] rounded-full p-1.5 grid grid-cols-5 gap-1"></nav>
+
+  <div id="sheet-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+  <div id="fx-root"></div>
+
+  <noscript>
+    <p style="padding:24px;font-family:Pretendard,sans-serif">갓생게임을 쓰려면 브라우저에서 자바스크립트를 켜 주세요.</p>
+  </noscript>
+
+<script>
+'use strict';
+
+/* =========================================================
+   기본 데이터
+   ========================================================= */
+const CATEGORY = {
+  health: { label: '운동', icon: 'running-round-bold' },
+  study: { label: '공부', icon: 'book-bookmark-bold' },
+  life: { label: '생활', icon: 'home-smile-bold' },
+  mind: { label: '마음', icon: 'heart-bold' },
+  work: { label: '일', icon: 'case-minimalistic-bold' },
+};
+const DIFF = { easy: '쉬움', normal: '보통', hard: '어려움' };
+const XP = { daily: { easy: 10, normal: 20, hard: 35 }, weekly: { easy: 40, normal: 70, hard: 120 } };
+const PERFECT_BONUS = 15;
+const TITLE_LADDER = [[1, '갓생 새싹'], [5, '루틴 수련생'], [10, '습관 장인'], [20, '갓생 마스터'], [35, '전설의 갓생러']];
+const PRESETS = [
+  { title: '물 2리터 마시기', type: 'daily', difficulty: 'easy', category: 'health' },
+  { title: '아침 7시 전에 일어나기', type: 'daily', difficulty: 'hard', category: 'life' },
+  { title: '책 20쪽 읽기', type: 'daily', difficulty: 'normal', category: 'study' },
+  { title: '30분 걷기', type: 'daily', difficulty: 'normal', category: 'health' },
+  { title: '자기 전 10분 일기 쓰기', type: 'daily', difficulty: 'easy', category: 'mind' },
+  { title: '오늘 할 일 3가지 정리하기', type: 'daily', difficulty: 'easy', category: 'work' },
+  { title: '헬스장 가기', type: 'weekly', difficulty: 'hard', category: 'health', target: 3 },
+  { title: '영단어 50개 외우기', type: 'weekly', difficulty: 'normal', category: 'study', target: 5 },
+  { title: '방 대청소하기', type: 'weekly', difficulty: 'normal', category: 'life', target: 1 },
+  { title: '사이드 프로젝트 2시간', type: 'weekly', difficulty: 'hard', category: 'work', target: 2 },
+  { title: '부모님께 안부 전화', type: 'weekly', difficulty: 'easy', category: 'mind', target: 1 },
+];
+const TABS = ['home', 'quests', 'friends', 'profile', 'settings'];
+const TAB_META = {
+  home: ['홈', 'home-2'],
+  quests: ['퀘스트', 'checklist-minimalistic'],
+  friends: ['친구', 'users-group-rounded'],
+  profile: ['프로필', 'user-circle'],
+  settings: ['설정', 'settings'],
+};
+
+/* =========================================================
+   상태
+   ========================================================= */
+const S = {
+  token: localStorage.getItem('gs.token'),
+  me: null,
+  quests: [],
+  friends: null,
+  incomingCount: 0,
+  ready: false,
+  netError: null,
+  questTab: 'daily',
+  friendTab: 'list',
+  authMode: 'login',
+  settings: gsLoadSettings(),
+  form: null,
+  openFriendId: null,
+  confirmResolve: null,
+  busy: {},
+  bars: {},
+  animate: true,
+};
+
+/* =========================================================
+   도구
+   ========================================================= */
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString('ko-KR');
+const icon = (name, cls = '') => `<iconify-icon icon="solar:${name}" class="${cls}" aria-hidden="true"></iconify-icon>`;
+const checkSvg = (size = 16) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const firstChar = (s) => [...String(s || '?').trim()][0] || '?';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function logoMark(size = 36) {
+  return `<span class="grid place-items-center rounded-[12px] bg-accent text-on-accent shrink-0" style="width:${size}px;height:${size}px">
+    <svg viewBox="0 0 24 24" width="${size * 0.56}" height="${size * 0.56}" fill="currentColor" aria-hidden="true">
+      <rect x="3" y="13" width="4.4" height="8" rx="1.6"/><rect x="9.8" y="8.5" width="4.4" height="12.5" rx="1.6"/><rect x="16.6" y="3" width="4.4" height="18" rx="1.6"/>
+    </svg></span>`;
+}
+function avatar(name, size = 44, me = false) {
+  return `<span class="avatar ${me ? 'me' : ''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px">${esc(firstChar(name))}</span>`;
+}
+function bar(id, ratio, cls = '') {
+  const p = Math.max(0, Math.min(1, ratio || 0));
+  const from = S.bars[id] ?? 0;
+  return `<div class="bar ${cls}"><i data-bar="${id}" data-p="${p}" style="--p:${from}"></i></div>`;
+}
+function seg(options, value, act, disabled = false) {
+  return `<div class="seg" role="tablist">${options.map(([v, label, extra = '']) => `
+    <button type="button" role="tab" aria-selected="${v === value}" data-act="${act}" data-v="${v}" class="seg-btn ${v === value ? 'on' : ''}" ${disabled ? 'disabled' : ''}>${label}${extra}</button>`).join('')}</div>`;
+}
+function stat(label, value, unit, ic) {
+  return `<div class="tile p-4">
+    <div class="flex items-center gap-1.5 text-ink-3 text-[12.5px] font-medium">${icon(ic, 'text-[15px]')}${label}</div>
+    <p class="mt-2.5 font-display text-[26px] font-bold tracking-tight tnum leading-none">${value}<span class="font-sans text-[14px] text-ink-3 font-semibold ml-1">${unit}</span></p>
+  </div>`;
+}
+function dateLabel() {
+  return new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
+}
+function greeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return '좋은 아침이에요';
+  if (h >= 11 && h < 17) return '좋은 오후예요';
+  if (h >= 17 && h < 22) return '좋은 저녁이에요';
+  return '늦은 밤까지 수고했어요';
+}
+function daysSince(t) { return Math.max(1, Math.floor((Date.now() - t) / 86400000) + 1); }
+function sortQuests(list) {
+  if (!S.settings.sortDone) return list;
+  return [...list].sort((a, b) => Number(a.done) - Number(b.done));
+}
+function haptic(pattern = 12) {
+  if (S.settings.haptics && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) { /* 지원하지 않는 기기 */ } }
+}
+
+/* =========================================================
+   API
+   ========================================================= */
+async function api(path, { method = 'GET', body } = {}) {
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(S.token ? { Authorization: `Bearer ${S.token}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw new Error('서버에 연결하지 못했어요. 서버가 켜져 있는지 확인해 주세요');
+  }
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
+  if (res.status === 401 && S.token) {
+    clearSession();
+    render();
+    throw new Error('로그인이 만료됐어요. 다시 로그인해 주세요');
+  }
+  if (!res.ok) throw new Error(data.error || '요청을 처리하지 못했어요');
+  return data;
+}
+function setState(d) {
+  if (d.token) { S.token = d.token; localStorage.setItem('gs.token', d.token); }
+  if (d.me) S.me = d.me;
+  if (d.quests) S.quests = d.quests;
+}
+function clearSession() {
+  S.token = null; S.me = null; S.quests = []; S.friends = null; S.incomingCount = 0;
+  localStorage.removeItem('gs.token');
+}
+async function loadFriends() {
+  if (!S.me) return;
+  const first = !S.friends;
+  try {
+    const d = await api('/friends');
+    S.friends = d; S.incomingCount = d.incoming.length; setState({ me: d.me });
+    if (currentTab() === 'friends') { if (first) S.animate = true; render(); } else renderTabbar(currentTab());
+  } catch (e) { if (currentTab() === 'friends') toast(e.message, 'danger-triangle-linear'); }
+}
+async function refreshMe() {
+  if (!S.token) return;
+  try { setState(await api('/me')); S.netError = null; } catch (e) { S.netError = e.message; }
+}
+
+/* =========================================================
+   렌더링
+   ========================================================= */
+function currentTab() { const t = location.hash.slice(1); return TABS.includes(t) ? t : 'home'; }
+function go(tab) {
+  if (currentTab() === tab && location.hash) { S.animate = true; S.bars = {}; render(); window.scrollTo({ top: 0 }); }
+  else location.hash = tab;
+}
+
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+}, { rootMargin: '0px 0px -6% 0px' });
+
+function render() {
+  const tab = currentTab();
+  $('#topbar').innerHTML = topbar();
+  $('#view').innerHTML = VIEWS[tab]();
+  renderTabbar(tab);
+  const animate = S.animate && !S.settings.reduceMotion;
+  S.animate = false;
+  if (animate) {
+    $$('#view [data-reveal]').forEach((el) => {
+      el.classList.add('reveal');
+      el.style.setProperty('--i', el.dataset.reveal);
+      io.observe(el);
+    });
+    setTimeout(() => $$('#view .reveal:not(.in)').forEach((el) => el.classList.add('in')), 2200);
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $$('[data-bar]').forEach((b) => { b.style.setProperty('--p', b.dataset.p); S.bars[b.dataset.bar] = Number(b.dataset.p); });
+  }));
+}
+
+function topbar() {
+  const me = S.me;
+  return `<div class="flex items-center justify-between h-16">
+    <button data-act="go" data-tab="home" class="flex items-center gap-2.5 rounded-2xl" aria-label="갓생게임 홈">
+      ${logoMark()}
+      <span class="flex flex-col text-left leading-none">
+        <span class="font-display text-[10px] tracking-[0.24em] text-ink-3 font-semibold">GODSAENG</span>
+        <span class="text-[16px] font-bold tracking-tight mt-1">갓생게임</span>
+      </span>
+    </button>
+    ${me ? `<div class="flex items-center gap-2">
+        <span class="chip" title="연속 달성">${icon('fire-bold', 'text-accent-fg text-[16px]')}<b class="font-display tnum">${me.streak}</b><span class="text-ink-3 text-[12px]">일</span></span>
+        <button data-act="go" data-tab="profile" class="chip" aria-label="내 프로필"><span class="font-display text-ink-3 text-[11px] font-semibold">LV</span><b class="font-display tnum">${me.level}</b></button>
+      </div>`
+      : S.ready ? `<button data-act="go" data-tab="profile" class="btn-ghost !min-h-[40px] !px-4 text-[14px]">로그인</button>` : ''}
+  </div>`;
+}
+
+function renderTabbar(active) {
+  $('#tabbar').innerHTML = TABS.map((t) => {
+    const [label, ic] = TAB_META[t];
+    const on = t === active;
+    const dot = t === 'friends' && S.incomingCount > 0 ? '<i class="dot"></i>' : '';
+    return `<a href="#${t}" data-tab-link="${t}" class="tab ${on ? 'on' : ''}" aria-current="${on ? 'page' : 'false'}">
+      ${icon(`${ic}-${on ? 'bold' : 'linear'}`, 'text-[23px]')}${dot}
+      <span class="text-[10.5px] font-semibold tracking-tight">${label}</span>
+    </a>`;
+  }).join('');
+}
+
+function connBanner() {
+  const msg = location.protocol === 'file:'
+    ? '파일을 직접 열면 저장과 친구 기능이 동작하지 않아요. 폴더에서 <b>node server.js</b>를 실행한 뒤 <b>http://localhost:3000</b>으로 접속해 주세요.'
+    : S.netError ? esc(S.netError) : '';
+  if (!msg) return '';
+  return `<div class="tile mt-2 p-4 flex gap-3 items-start" role="alert">
+    <span class="text-danger text-[20px] mt-0.5">${icon('danger-triangle-linear')}</span>
+    <div class="flex-1 text-[14px] leading-relaxed text-ink-2">${msg}
+      ${location.protocol !== 'file:' ? `<div class="mt-3"><button data-act="retry" class="btn-ghost !min-h-[40px] text-[14px]">${icon('restart-linear')}다시 연결하기</button></div>` : ''}
+    </div>
+  </div>`;
+}
+
+function loadingView() {
+  return `<div class="min-h-[60dvh] grid place-items-center"><div class="pulse-soft">${logoMark(56)}</div></div>`;
+}
+
+function needLogin(title, desc) {
+  return `${connBanner()}
+  <section class="pt-10" data-reveal="0">
+    <div class="bezel"><div class="core p-7">
+      <span class="w-14 h-14 rounded-2xl grid place-items-center bg-accent/10 text-accent-fg text-[28px]">${icon('lock-keyhole-minimalistic-bold')}</span>
+      <h1 class="mt-6 text-[24px] leading-snug font-bold tracking-tight">${title}</h1>
+      <p class="mt-2 text-ink-2 leading-relaxed">${desc}</p>
+      <div class="mt-7 flex flex-wrap gap-3">
+        <button data-act="go" data-tab="profile" class="btn-primary">로그인하기<span class="arrow">${icon('arrow-right-linear', 'text-[20px]')}</span></button>
+        <button data-act="start-signup" class="btn-ghost">회원가입</button>
+      </div>
+    </div></div>
+  </section>`;
+}
+
+/* ---------------- 홈 ---------------- */
+function viewHome() {
+  if (!S.ready) return loadingView();
+  if (!S.me) return viewWelcome();
+  const me = S.me;
+  const daily = sortQuests(S.quests.filter((q) => q.type === 'daily'));
+  const weekly = sortQuests(S.quests.filter((q) => q.type === 'weekly'));
+  const remain = me.today.total - me.today.done;
+  const sub = me.today.total === 0 ? '첫 퀘스트를 만들고 오늘의 경험치를 모아 보세요'
+    : me.today.perfect ? '오늘 퀘스트를 모두 끝냈어요. 완벽한 하루예요'
+    : `오늘 남은 일일 퀘스트는 ${remain}개예요`;
+  const ratio = me.xp / me.xpNext;
+  const todayIdx = Math.max(0, me.week.days.findIndex((d) => d.today));
+  const left = 7 - todayIdx;
+  const cheers = me.cheersToday || [];
+  const cheerNames = cheers.slice(0, 2).map(esc).join(', ') + (cheers.length > 2 ? ` 외 ${cheers.length - 2}명` : '');
+
+  return `${connBanner()}
+  <section class="pt-3" data-reveal="0">
+    <p class="text-[13px] text-ink-3 font-medium">${dateLabel()}</p>
+    <h1 class="mt-1.5 text-[26px] leading-snug font-bold tracking-tight">${greeting()},<br><span class="text-accent-fg">${esc(me.nickname)}</span>님</h1>
+    <p class="mt-2 text-ink-2 text-[15px]">${sub}</p>
+  </section>
+
+  ${cheers.length ? `<section class="mt-5" data-reveal="1">
+    <div class="tile p-4 flex items-center gap-3">
+      <span class="w-10 h-10 rounded-full grid place-items-center bg-accent/12 text-accent-fg text-[20px]">${icon('hand-heart-bold')}</span>
+      <p class="text-[14px] leading-snug"><b>${cheerNames}</b>님이 오늘 응원을 보냈어요</p>
+    </div></section>` : ''}
+
+  <section class="mt-6" data-reveal="1">
+    <div class="bezel"><div class="core relative overflow-hidden p-6">
+      <div class="absolute -right-16 -top-16 w-56 h-56 rounded-full pointer-events-none" style="background:radial-gradient(circle, rgb(var(--accent) / .18), transparent 68%)"></div>
+      <div class="relative flex items-start justify-between gap-4">
+        <div>
+          <span class="eyebrow">${icon('crown-minimalistic-bold', 'text-[13px]')}${esc(me.title)}</span>
+          <div class="flex items-baseline gap-2 mt-4">
+            <span class="font-display text-ink-3 text-[18px] font-semibold">LV</span>
+            <span class="font-display text-[68px] leading-[0.9] font-bold tracking-tighter tnum">${me.level}</span>
+          </div>
+        </div>
+        <div class="text-right pt-1">
+          <p class="text-[12px] text-ink-3">누적 경험치</p>
+          <p class="font-display text-[18px] font-semibold tnum mt-0.5">${fmt(me.totalXp)}<span class="text-ink-3 text-[13px] ml-1">XP</span></p>
+        </div>
+      </div>
+      <div class="relative mt-7">
+        <div class="flex items-center justify-between text-[13px] mb-2.5">
+          <span class="text-ink-2">다음 레벨까지 <b class="text-ink font-display tnum">${fmt(me.xpNext - me.xp)} XP</b></span>
+          <span class="font-display tnum text-ink-3">${fmt(me.xp)} / ${fmt(me.xpNext)}</span>
+        </div>
+        ${bar('xp', ratio, '!h-3')}
+      </div>
+    </div></div>
+  </section>
+
+  <section class="mt-3 grid grid-cols-[1.2fr_1fr] gap-3" data-reveal="2">
+    <div class="tile p-4 relative overflow-hidden">
+      <div class="flex items-center gap-1.5 text-ink-3 text-[12.5px] font-medium">${icon('fire-bold', 'text-accent-fg text-[15px]')}연속 달성</div>
+      <p class="mt-2.5 font-display text-[34px] font-bold tracking-tight tnum leading-none">${me.streak}<span class="font-sans text-[15px] text-ink-3 font-semibold ml-1">일째</span></p>
+      <p class="mt-2 text-[12px] text-ink-3">최고 기록 ${me.bestStreak}일</p>
+    </div>
+    <div class="tile p-4">
+      <div class="flex items-center gap-1.5 text-ink-3 text-[12.5px] font-medium">${icon('checklist-minimalistic-linear', 'text-[15px]')}오늘</div>
+      <p class="mt-2.5 font-display text-[34px] font-bold tracking-tight tnum leading-none">${me.today.done}<span class="text-ink-3 text-[20px] font-semibold">/${me.today.total}</span></p>
+      <p class="mt-2 text-[12px] text-ink-3">일일 퀘스트 완료</p>
+    </div>
+  </section>
+
+  <section class="mt-3" data-reveal="3">${weekStrip(me.week.days, '이번 주 올클리어')}</section>
+
+  <section class="mt-10" data-reveal="4">
+    <div class="flex items-end justify-between px-1">
+      <div>
+        <h2 class="text-[20px] font-bold tracking-tight">일일 퀘스트</h2>
+        <p class="text-[13px] text-ink-3 mt-0.5">매일 0시에 초기화돼요 · 모두 끝내면 +${PERFECT_BONUS} XP</p>
+      </div>
+      <button data-act="manage" data-v="daily" class="text-[13px] font-semibold text-ink-2 h-10 px-3 rounded-full hover:bg-line/[0.06]">관리</button>
+    </div>
+    ${me.today.perfect ? `<div class="mt-4 rounded-[1.4rem] p-4 flex items-center gap-3 bg-accent/10" style="box-shadow:inset 0 0 0 1px rgb(var(--accent) / .25)">
+        <span class="text-accent-fg text-[22px]">${icon('cup-star-bold')}</span>
+        <p class="text-[14px]"><b>오늘 퀘스트 올클리어!</b> <span class="text-ink-2">보너스 ${PERFECT_BONUS} XP를 받았어요</span></p>
+      </div>` : ''}
+    <ul class="mt-4 grid gap-2.5">
+      ${daily.length ? daily.map(dailyRow).join('') : emptyQuests('daily')}
+    </ul>
+  </section>
+
+  <section class="mt-10" data-reveal="5">
+    <div class="flex items-end justify-between px-1">
+      <div>
+        <h2 class="text-[20px] font-bold tracking-tight">주간 퀘스트</h2>
+        <p class="text-[13px] text-ink-3 mt-0.5">${left === 1 ? '오늘 밤 12시에 초기화돼요' : `월요일 0시 초기화 · ${left}일 남았어요`}</p>
+      </div>
+      <button data-act="manage" data-v="weekly" class="text-[13px] font-semibold text-ink-2 h-10 px-3 rounded-full hover:bg-line/[0.06]">관리</button>
+    </div>
+    <div class="mt-4 grid gap-2.5">
+      ${weekly.length ? weekly.map(weeklyRow).join('') : emptyQuests('weekly')}
+    </div>
+  </section>`;
+}
+
+function dailyRow(q) {
+  const c = CATEGORY[q.category] || CATEGORY.life;
+  return `<li><button data-act="toggle" data-id="${q.id}" class="qrow tile ${q.done ? 'done' : ''}" aria-pressed="${q.done}">
+    <span class="check">${checkSvg(16)}</span>
+    <span class="flex-1 min-w-0">
+      <span class="q-title block font-semibold text-[15.5px] leading-snug">${esc(q.title)}</span>
+      <span class="flex items-center gap-1.5 text-[12.5px] text-ink-3 mt-1">${icon(c.icon, 'text-[13px]')}${c.label} · ${DIFF[q.difficulty]}</span>
+    </span>
+    <span class="xp-chip">+${q.reward} XP</span>
+  </button></li>`;
+}
+
+function weeklyRow(q) {
+  const c = CATEGORY[q.category] || CATEGORY.life;
+  const dots = Array.from({ length: q.target }, (_, i) => `<span class="seg-dot ${i < q.progress ? 'on' : ''}"></span>`).join('');
+  return `<div class="tile p-4">
+    <div class="flex items-center gap-3">
+      <span class="cat ${q.done ? '!bg-accent !text-on-accent' : ''}">${q.done ? checkSvg(18) : icon(c.icon)}</span>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-[15.5px] leading-snug ${q.done ? 'text-ink-3 line-through' : ''}">${esc(q.title)}</p>
+        <p class="text-[12.5px] text-ink-3 mt-0.5">주 ${q.target}회 · ${DIFF[q.difficulty]}</p>
+      </div>
+      <span class="xp-chip ${q.done ? 'muted' : ''}">+${q.reward} XP</span>
+    </div>
+    <div class="mt-4 flex items-center gap-3">
+      <div class="flex-1 grid gap-1.5" style="grid-template-columns:repeat(${q.target},minmax(0,1fr))">${dots}</div>
+      <span class="font-display tnum text-[14px] font-semibold w-9 text-right">${q.progress}/${q.target}</span>
+      ${q.progress > 0 ? `<button data-act="wk-minus" data-id="${q.id}" class="icon-btn !w-10 !h-10 font-display text-[20px]" aria-label="${esc(q.title)} 1회 취소">−</button>` : ''}
+      <button data-act="wk-plus" data-id="${q.id}" class="h-10 px-4 rounded-full font-semibold text-[14px] ${q.done ? 'bg-line/[0.06] text-ink-3' : 'bg-accent text-on-accent hover:scale-[1.03] active:scale-[0.96]'}" ${q.done ? 'disabled' : ''}>${q.done ? '완료' : '+1회'}</button>
+    </div>
+  </div>`;
+}
+
+function emptyQuests(type) {
+  const isDaily = type === 'daily';
+  return `<div class="rounded-[1.6rem] p-6 text-center" style="box-shadow:inset 0 0 0 1.5px rgb(var(--line) / .1)">
+    <span class="mx-auto w-12 h-12 rounded-2xl grid place-items-center bg-line/[0.06] text-ink-2 text-[24px]">${icon(isDaily ? 'checklist-minimalistic-linear' : 'calendar-linear')}</span>
+    <p class="mt-4 font-semibold">아직 ${isDaily ? '일일' : '주간'} 퀘스트가 없어요</p>
+    <p class="mt-1 text-[13.5px] text-ink-3">${isDaily ? '매일 반복할 작은 습관 하나부터 시작해 보세요' : '주 3회 운동처럼 횟수로 정하는 목표를 세워 보세요'}</p>
+    <button data-act="manage" data-v="${type}" data-new="1" class="btn-ghost mt-5 text-[14px]">${icon('add-circle-linear', 'text-[18px]')}퀘스트 만들기</button>
+  </div>`;
+}
+
+function weekStrip(days, title) {
+  const labels = ['월', '화', '수', '목', '금', '토', '일'];
+  const cnt = days.filter((d) => d.perfect).length;
+  return `<div class="bezel sm"><div class="core p-4">
+    <div class="flex items-center justify-between px-1">
+      <p class="text-[14px] font-semibold">${title}</p>
+      <p class="text-[13px] text-ink-3"><b class="text-ink font-display tnum">${cnt}</b> / 7일</p>
+    </div>
+    <div class="grid grid-cols-7 gap-1 mt-4">
+      ${days.map((d, i) => `<div class="flex flex-col items-center gap-2">
+        <span class="text-[11px] font-semibold ${d.today ? 'text-accent-fg' : 'text-ink-3'}">${labels[i]}</span>
+        <span class="day ${d.perfect ? 'perfect' : ''} ${d.today ? 'today' : ''} ${d.future ? 'future' : ''}" aria-label="${labels[i]}요일 ${d.perfect ? '올클리어' : '미달성'}">${d.perfect ? checkSvg(15) : ''}</span>
+      </div>`).join('')}
+    </div>
+  </div></div>`;
+}
+
+/* ---------------- 비로그인 소개 ---------------- */
+function viewWelcome() {
+  const ladder = TITLE_LADDER.map(([lv, t], i) => `<span class="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold ${i === 2 ? 'bg-accent text-on-accent' : 'bg-line/[0.06] text-ink-2'}"><span class="font-display">Lv${lv}</span>${t}</span>`).join('');
+  return `${connBanner()}
+  <section class="pt-6" data-reveal="0">
+    <span class="eyebrow">${icon('bolt-bold', 'text-[13px]')}Todo, but playable</span>
+    <h1 class="mt-5 text-[38px] leading-[1.22] font-bold tracking-tight">할 일을 끝낼 때마다<br><span class="text-accent-fg">레벨이 오릅니다</span></h1>
+    <p class="mt-5 text-[16px] leading-relaxed text-ink-2 max-w-[34ch]">갓생게임은 할 일 목록을 퀘스트로 바꿔 줘요. 체크 한 번에 경험치가 쌓이고, 매일 이어 가면 연속 달성 기록이 늘어나요.</p>
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <button data-act="start-signup" class="btn-primary">무료로 시작하기<span class="arrow">${icon('arrow-right-linear', 'text-[20px]')}</span></button>
+      <button data-act="go" data-tab="profile" class="btn-ghost">로그인</button>
+    </div>
+  </section>
+
+  <section class="relative mt-12 pb-6" data-reveal="1" aria-hidden="true">
+    <div class="bezel"><div class="core p-5">
+      <div class="flex items-center justify-between">
+        <span class="eyebrow">습관 장인</span>
+        <span class="text-[12px] text-ink-3 font-display tnum">1,284 XP</span>
+      </div>
+      <div class="flex items-baseline gap-1.5 mt-3">
+        <span class="font-display text-ink-3 font-semibold">LV</span>
+        <span class="font-display text-[52px] leading-none font-bold tracking-tighter">12</span>
+      </div>
+      <div class="bar mt-4"><i style="--p:.68"></i></div>
+      <ul class="mt-5 grid gap-2">
+        ${[['물 2리터 마시기', 10, true], ['책 20쪽 읽기', 20, true], ['30분 걷기', 20, false]].map(([t, x, d]) => `
+        <li class="qrow tile !py-3 ${d ? 'done' : ''}"><span class="check">${checkSvg(15)}</span><span class="q-title flex-1 font-semibold text-[14.5px]">${t}</span><span class="xp-chip">+${x} XP</span></li>`).join('')}
+      </ul>
+    </div></div>
+    <div class="float-chip absolute -bottom-1 right-4 flex items-center gap-2 h-11 px-4 rounded-full bg-surface-2 text-[14px] font-semibold" style="box-shadow:inset 0 0 0 1px rgb(var(--line) / .1), 0 20px 40px -16px rgb(0 0 0 / .5)">
+      ${icon('fire-bold', 'text-accent-fg text-[18px]')}연속 <span class="font-display tnum">17</span>일째
+    </div>
+  </section>
+
+  <section class="mt-14" data-reveal="2">
+    <div class="grid grid-cols-3 divide-x divide-line/[0.08] tile py-5">
+      ${[['10–120', 'XP', '퀘스트 하나당'], ['+15', 'XP', '올클리어 보너스'], ['매주 월', '', '주간 퀘스트 초기화']].map(([n, u, l]) => `
+      <div class="px-2 text-center">
+        <p class="font-display text-[22px] font-bold tracking-tight leading-none">${n}<span class="text-[12px] text-ink-3 ml-0.5">${u}</span></p>
+        <p class="mt-2 text-[11.5px] text-ink-3 leading-snug">${l}</p>
+      </div>`).join('')}
+    </div>
+  </section>
+
+  <section class="mt-20">
+    <div data-reveal="3">
+      <span class="eyebrow">How it plays</span>
+      <h2 class="mt-4 text-[28px] leading-snug font-bold tracking-tight">해야 하는 일이<br>하고 싶은 일이 되도록</h2>
+    </div>
+    <div class="mt-8 grid grid-cols-2 gap-3">
+      <div class="col-span-2 bezel" data-reveal="4"><div class="core p-6">
+        <span class="w-11 h-11 rounded-2xl grid place-items-center bg-accent/10 text-accent-fg text-[22px]">${icon('star-shine-bold')}</span>
+        <h3 class="mt-5 text-[18px] font-bold">끝낸 만큼 바로 경험치</h3>
+        <p class="mt-1.5 text-[14px] text-ink-2 leading-relaxed">난이도에 따라 10–120 XP를 받아요. 레벨이 오르면 새 칭호가 열려요.</p>
+        <div class="mt-5 flex flex-wrap gap-1.5">${ladder}</div>
+      </div></div>
+      <div class="tile p-5" data-reveal="5">
+        <span class="text-accent-fg text-[24px]">${icon('fire-bold')}</span>
+        <h3 class="mt-4 text-[16px] font-bold leading-snug">하루도 끊기지 않게</h3>
+        <p class="mt-1.5 text-[13px] text-ink-2 leading-relaxed">일일 퀘스트를 모두 끝낸 날이 이어지면 연속 기록이 쌓여요.</p>
+      </div>
+      <div class="tile p-5" data-reveal="6">
+        <span class="text-accent-fg text-[24px]">${icon('calendar-linear')}</span>
+        <h3 class="mt-4 text-[16px] font-bold leading-snug">횟수로 정하는 주간 목표</h3>
+        <div class="mt-3 grid grid-cols-3 gap-1"><span class="seg-dot on"></span><span class="seg-dot on"></span><span class="seg-dot"></span></div>
+        <p class="mt-2 text-[13px] text-ink-2">헬스장 주 3회 · 2/3</p>
+      </div>
+      <div class="col-span-2 tile p-5 flex items-center gap-4" data-reveal="7">
+        <div class="flex -space-x-2 shrink-0">${avatar('하', 40)}${avatar('박', 40)}${avatar('나', 40, true)}</div>
+        <div>
+          <h3 class="text-[16px] font-bold">친구와 랭킹 겨루기</h3>
+          <p class="mt-1 text-[13px] text-ink-2 leading-relaxed">고유 ID로 친구를 추가하고, 서로의 레벨과 연속 기록을 확인하고, 하루 한 번 응원을 보내요.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-20" data-reveal="8">
+    <h2 class="text-[22px] font-bold tracking-tight px-1">시작은 세 단계면 충분해요</h2>
+    <ol class="mt-6 grid gap-0">
+      ${[['계정 만들기', '아이디와 닉네임만 정하면 돼요.'], ['퀘스트 정하기', '추천 퀘스트를 고르거나 직접 만들어요.'], ['체크하고 레벨업', '끝낼 때마다 경험치가 쌓이고 칭호가 바뀌어요.']].map(([t, d], i) => `
+      <li class="flex gap-4">
+        <div class="flex flex-col items-center">
+          <span class="w-9 h-9 rounded-full grid place-items-center font-display font-bold text-[15px] ${i === 0 ? 'bg-accent text-on-accent' : 'bg-line/[0.07] text-ink-2'}">${i + 1}</span>
+          ${i < 2 ? '<span class="w-px flex-1 bg-line/10 my-1"></span>' : ''}
+        </div>
+        <div class="pb-7 pt-1.5"><p class="font-semibold">${t}</p><p class="text-[14px] text-ink-3 mt-1">${d}</p></div>
+      </li>`).join('')}
+    </ol>
+  </section>
+
+  <section class="mt-10" data-reveal="9">
+    <div class="bezel"><div class="core relative overflow-hidden p-7">
+      <div class="absolute -left-20 -bottom-24 w-64 h-64 rounded-full pointer-events-none" style="background:radial-gradient(circle, rgb(var(--accent) / .2), transparent 68%)"></div>
+      <h2 class="relative text-[26px] leading-snug font-bold tracking-tight">오늘 할 일 하나로<br>시작해 보세요</h2>
+      <p class="relative mt-3 text-[14px] text-ink-2">설치 없이 브라우저에서 바로 쓸 수 있어요.</p>
+      <button data-act="start-signup" class="relative btn-primary mt-7 w-full">무료로 시작하기<span class="arrow">${icon('arrow-right-linear', 'text-[20px]')}</span></button>
+    </div></div>
+  </section>
+  <footer class="mt-12 text-center text-[12px] text-ink-3">© 2026 갓생게임</footer>`;
+}
+
+/* ---------------- 퀘스트 ---------------- */
+function viewQuests() {
+  if (!S.ready) return loadingView();
+  if (!S.me) return needLogin('퀘스트를 만들려면<br>로그인이 필요해요', '로그인하면 일일·주간 퀘스트를 만들고 경험치를 모을 수 있어요.');
+  const t = S.questTab;
+  const dailyN = S.quests.filter((q) => q.type === 'daily').length;
+  const weeklyN = S.quests.filter((q) => q.type === 'weekly').length;
+  const list = S.quests.filter((q) => q.type === t);
+  const titles = new Set(S.quests.map((q) => q.title));
+  const presets = PRESETS.map((p, i) => ({ ...p, i })).filter((p) => p.type === t && !titles.has(p.title));
+
+  return `${connBanner()}
+  <section class="pt-3" data-reveal="0">
+    <h1 class="text-[28px] font-bold tracking-tight">퀘스트</h1>
+    <p class="mt-1 text-ink-2 text-[15px]">매일 반복할 일과 이번 주 목표를 정해 두세요</p>
+  </section>
+  <section class="mt-6" data-reveal="1">
+    ${seg([['daily', '일일', `<span class="count">${dailyN}</span>`], ['weekly', '주간', `<span class="count">${weeklyN}</span>`]], t, 'quest-tab')}
+  </section>
+  <section class="mt-5" data-reveal="2">
+    <button data-act="quest-new" class="btn-primary w-full">새 ${t === 'daily' ? '일일' : '주간'} 퀘스트 추가<span class="arrow">${icon('add-circle-linear', 'text-[22px]')}</span></button>
+  </section>
+
+  ${presets.length ? `<section class="mt-8" data-reveal="3">
+    <h2 class="px-1 text-[14px] font-semibold text-ink-2">추천 퀘스트</h2>
+    <div class="mt-3 -mx-4 px-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      ${presets.map((p) => `<button data-act="preset" data-i="${p.i}" class="shrink-0 inline-flex items-center gap-2 h-11 pl-3 pr-4 rounded-full bg-line/[0.05] text-[14px] font-semibold hover:bg-line/[0.09] active:scale-[0.96]" style="box-shadow:inset 0 0 0 1px rgb(var(--line) / .07)">
+        <span class="text-ink-3">${icon(CATEGORY[p.category].icon, 'text-[16px]')}</span>${esc(p.title)}${p.target ? `<span class="text-ink-3 text-[12px]">주 ${p.target}회</span>` : ''}
+      </button>`).join('')}
+    </div>
+  </section>` : ''}
+
+  <section class="mt-8" data-reveal="4">
+    <div class="flex items-center justify-between px-1">
+      <h2 class="text-[14px] font-semibold text-ink-2">내 ${t === 'daily' ? '일일' : '주간'} 퀘스트</h2>
+      <span class="text-[12.5px] text-ink-3 font-display tnum">${list.length} / ${t === 'daily' ? 20 : 10}</span>
+    </div>
+    <div class="mt-3 grid gap-2.5">
+      ${list.length ? list.map(manageRow).join('') : `<div class="rounded-[1.6rem] p-6 text-center text-[14px] text-ink-3" style="box-shadow:inset 0 0 0 1.5px rgb(var(--line) / .1)">아직 만든 퀘스트가 없어요. 위의 추천 퀘스트를 눌러 바로 시작해 보세요.</div>`}
+    </div>
+  </section>
+
+  <section class="mt-10" data-reveal="5">
+    <div class="bezel sm"><div class="core p-5">
+      <div class="flex items-center gap-2">${icon('info-circle-linear', 'text-ink-3 text-[18px]')}<h2 class="font-semibold text-[15px]">보상 규칙</h2></div>
+      <div class="mt-4 grid grid-cols-4 text-center text-[13px] gap-y-2">
+        <span></span>${['쉬움', '보통', '어려움'].map((d) => `<span class="text-ink-3 font-medium">${d}</span>`).join('')}
+        <span class="text-left text-ink-2 font-semibold">일일</span>${Object.values(XP.daily).map((x) => `<span class="font-display font-semibold tnum">${x}</span>`).join('')}
+        <span class="text-left text-ink-2 font-semibold">주간</span>${Object.values(XP.weekly).map((x) => `<span class="font-display font-semibold tnum">${x}</span>`).join('')}
+      </div>
+      <ul class="mt-5 grid gap-1.5 text-[13px] text-ink-2 leading-relaxed">
+        <li>· 그날 일일 퀘스트를 모두 끝내면 올클리어 보너스 <b class="text-ink">+${PERFECT_BONUS} XP</b></li>
+        <li>· 레벨 n에서 다음 레벨까지 필요한 경험치는 <b class="text-ink">100 + (n−1)×40 XP</b></li>
+        <li>· 완료를 취소하면 받은 경험치도 함께 돌려놓아요</li>
+      </ul>
+    </div></div>
+  </section>`;
+}
+
+function manageRow(q) {
+  const c = CATEGORY[q.category] || CATEGORY.life;
+  const status = q.type === 'daily' ? (q.done ? '오늘 완료' : '오늘 아직') : `이번 주 ${q.progress}/${q.target}`;
+  return `<div class="tile flex items-center gap-3 p-3 pl-4">
+    <span class="cat">${icon(c.icon)}</span>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold text-[15px] leading-snug">${esc(q.title)}</p>
+      <p class="text-[12.5px] text-ink-3 mt-0.5">${q.type === 'weekly' ? `주 ${q.target}회 · ` : ''}${DIFF[q.difficulty]} · +${q.reward} XP · <span class="${q.done ? 'text-accent-fg' : ''}">${status}</span></p>
+    </div>
+    <button data-act="quest-edit" data-id="${q.id}" class="icon-btn" aria-label="${esc(q.title)} 수정">${icon('pen-2-linear', 'text-[18px]')}</button>
+  </div>`;
+}
+
+/* ---------------- 친구 ---------------- */
+function viewFriends() {
+  if (!S.ready) return loadingView();
+  if (!S.me) return needLogin('친구와 함께하려면<br>로그인이 필요해요', '로그인하면 고유 ID로 친구를 추가하고 서로의 레벨과 연속 기록을 볼 수 있어요.');
+  const F = S.friends;
+  const t = S.friendTab;
+  const badge = S.incomingCount ? `<span class="badge">${S.incomingCount}</span>` : '';
+  return `${connBanner()}
+  <section class="pt-3" data-reveal="0">
+    <h1 class="text-[28px] font-bold tracking-tight">친구</h1>
+    <p class="mt-1 text-ink-2 text-[15px]">친구와 레벨, 연속 기록을 겨뤄 보세요</p>
+  </section>
+  <section class="mt-6" data-reveal="1">
+    ${seg([['list', '친구', `<span class="count">${F ? F.friends.length : ''}</span>`], ['add', '친구 추가', badge]], t, 'friend-tab')}
+  </section>
+  ${!F ? `<div class="py-16 grid place-items-center"><div class="pulse-soft text-ink-3 text-[14px]">친구 목록을 불러오는 중이에요</div></div>`
+    : t === 'list' ? friendList(F) : friendAdd(F)}`;
+}
+
+function friendList(F) {
+  const rows = [...F.friends.map((f) => ({ ...f, isMe: false })), { ...F.me, isMe: true }]
+    .sort((a, b) => b.totalXp - a.totalXp || a.nickname.localeCompare(b.nickname, 'ko'));
+  const list = `<div class="bezel mt-6" data-reveal="2"><div class="core p-2">
+    <div class="flex items-center justify-between px-3 pt-3 pb-2">
+      <p class="text-[14px] font-semibold">누적 경험치 랭킹</p>
+      <p class="text-[12px] text-ink-3">나 포함 ${rows.length}명</p>
+    </div>
+    <ul>
+      ${rows.map((f, i) => `<li><button data-act="${f.isMe ? 'go' : 'friend-open'}" ${f.isMe ? 'data-tab="profile"' : `data-id="${f.id}"`} class="w-full flex items-center gap-3 px-3 py-3 rounded-[1.3rem] text-left hover:bg-line/[0.04] active:scale-[0.98] ${f.isMe ? 'bg-accent/[0.07]' : ''}">
+        <span class="w-7 text-center font-display font-bold text-[15px] tnum ${i === 0 ? 'text-accent-fg' : 'text-ink-3'}">${i === 0 ? icon('crown-minimalistic-bold', 'text-[18px]') : i + 1}</span>
+        ${avatar(f.nickname, 44, f.isMe)}
+        <span class="flex-1 min-w-0">
+          <span class="flex items-center gap-1.5"><span class="font-semibold text-[15px] truncate">${esc(f.nickname)}</span>${f.isMe ? '<span class="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-accent text-on-accent">나</span>' : ''}</span>
+          <span class="block text-[12.5px] text-ink-3 mt-0.5">${esc(f.title)} · <span class="font-display">LV ${f.level}</span> · ${fmt(f.totalXp)} XP</span>
+        </span>
+        <span class="flex items-center gap-1 text-[13px] font-semibold ${f.streak ? '' : 'text-ink-3'}">${icon('fire-bold', f.streak ? 'text-accent-fg' : '')}<span class="font-display tnum">${f.streak}</span>일</span>
+      </button></li>`).join('')}
+    </ul>
+  </div></div>`;
+  const empty = !F.friends.length ? `<div class="tile mt-3 p-6 text-center" data-reveal="3">
+      <span class="mx-auto w-12 h-12 rounded-2xl grid place-items-center bg-accent/10 text-accent-fg text-[24px]">${icon('user-plus-rounded-bold')}</span>
+      <p class="mt-4 font-semibold">아직 친구가 없어요</p>
+      <p class="mt-1 text-[13.5px] text-ink-3">친구의 고유 ID를 입력해서 함께 갓생을 시작해 보세요</p>
+      <button data-act="friend-tab" data-v="add" class="btn-ghost mt-5 text-[14px]">${icon('user-plus-rounded-linear', 'text-[18px]')}친구 추가하기</button>
+    </div>` : '';
+  return list + empty;
+}
+
+function friendAdd(F) {
+  const me = F.me;
+  return `
+  <section class="mt-6" data-reveal="2">
+    <div class="bezel"><div class="core p-5">
+      <p class="text-[13px] text-ink-3 font-medium flex items-center gap-1.5">${icon('user-id-linear', 'text-[16px]')}내 고유 ID</p>
+      <p class="mt-2 font-display text-[30px] font-bold tracking-[0.06em]">${esc(me.code)}</p>
+      <p class="mt-1 text-[13px] text-ink-3">친구에게 이 ID를 알려 주면 친구 요청을 받을 수 있어요</p>
+      <div class="mt-5 grid grid-cols-2 gap-2">
+        <button data-act="copy-code" class="btn-ghost text-[14px]">${icon('copy-linear', 'text-[18px]')}복사하기</button>
+        <button data-act="share-code" class="btn-ghost text-[14px]">${icon('share-linear', 'text-[18px]')}공유하기</button>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="mt-6" data-reveal="3">
+    <form data-form="friend-add" class="tile p-5" novalidate>
+      <label for="friend-code" class="label !mx-0">친구의 고유 ID로 요청 보내기</label>
+      <div class="flex gap-2">
+        <input id="friend-code" name="code" class="field uppercase font-display tracking-[0.06em] flex-1" placeholder="GS-XXXXXX" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button type="submit" class="btn-primary center !min-h-[56px] !px-5 shrink-0">요청</button>
+      </div>
+      <p id="friend-error" class="err" hidden></p>
+    </form>
+  </section>
+
+  <section class="mt-8" data-reveal="4">
+    <h2 class="px-1 text-[14px] font-semibold text-ink-2 flex items-center gap-2">받은 요청 ${F.incoming.length ? `<span class="badge">${F.incoming.length}</span>` : ''}</h2>
+    <div class="mt-3 grid gap-2.5">
+      ${F.incoming.length ? F.incoming.map((r) => `<div class="tile flex items-center gap-3 p-3 pl-4">
+        ${avatar(r.user.nickname, 44)}
+        <div class="flex-1 min-w-0"><p class="font-semibold text-[15px] truncate">${esc(r.user.nickname)}</p><p class="text-[12.5px] text-ink-3"><span class="font-display">LV ${r.user.level}</span> · ${esc(r.user.code)}</p></div>
+        <button data-act="req-decline" data-id="${r.id}" class="icon-btn" aria-label="${esc(r.user.nickname)}님의 요청 거절">${icon('close-circle-linear', 'text-[20px]')}</button>
+        <button data-act="req-accept" data-id="${r.id}" class="h-11 px-4 rounded-full bg-accent text-on-accent font-semibold text-[14px] hover:scale-[1.03] active:scale-[0.96]">수락</button>
+      </div>`).join('') : `<p class="px-1 text-[13.5px] text-ink-3">받은 친구 요청이 없어요</p>`}
+    </div>
+  </section>
+
+  <section class="mt-8" data-reveal="5">
+    <h2 class="px-1 text-[14px] font-semibold text-ink-2">보낸 요청</h2>
+    <div class="mt-3 grid gap-2.5">
+      ${F.outgoing.length ? F.outgoing.map((r) => `<div class="tile flex items-center gap-3 p-3 pl-4">
+        ${avatar(r.user.nickname, 44)}
+        <div class="flex-1 min-w-0"><p class="font-semibold text-[15px] truncate">${esc(r.user.nickname)}</p><p class="text-[12.5px] text-ink-3">수락을 기다리고 있어요 · ${esc(r.user.code)}</p></div>
+        <button data-act="req-cancel" data-id="${r.id}" class="btn-ghost !min-h-[44px] !px-4 text-[13px]">취소</button>
+      </div>`).join('') : `<p class="px-1 text-[13.5px] text-ink-3">보낸 친구 요청이 없어요</p>`}
+    </div>
+  </section>`;
+}
+
+/* ---------------- 프로필 ---------------- */
+function viewProfile() {
+  if (!S.ready) return loadingView();
+  if (!S.me) return authView();
+  const me = S.me;
+  return `${connBanner()}
+  <section class="pt-4 flex items-center gap-4" data-reveal="0">
+    ${avatar(me.nickname, 76, true)}
+    <div class="flex-1 min-w-0">
+      <h1 class="text-[24px] font-bold tracking-tight leading-snug truncate">${esc(me.nickname)}</h1>
+      <p class="text-[14px] ${me.bio ? 'text-ink-2' : 'text-ink-3'} mt-0.5 leading-snug">${me.bio ? esc(me.bio) : '한 줄 소개를 적어 보세요'}</p>
+      <p class="text-[12px] text-ink-3 mt-1">@${esc(me.username)}</p>
+    </div>
+    <button data-act="profile-edit" class="icon-btn" aria-label="프로필 수정">${icon('pen-2-linear', 'text-[18px]')}</button>
+  </section>
+
+  <section class="mt-7" data-reveal="1">
+    <div class="bezel"><div class="core p-5 flex items-center gap-4">
+      <div class="flex-1 min-w-0">
+        <p class="text-[13px] text-ink-3 font-medium flex items-center gap-1.5">${icon('user-id-linear', 'text-[16px]')}내 고유 ID</p>
+        <p class="mt-1.5 font-display text-[26px] font-bold tracking-[0.06em]">${esc(me.code)}</p>
+        <p class="text-[12.5px] text-ink-3 mt-0.5">친구 추가에 쓰는 ID예요</p>
+      </div>
+      <button data-act="copy-code" class="btn-ghost !min-h-[44px] text-[14px] shrink-0">${icon('copy-linear', 'text-[18px]')}복사</button>
+    </div></div>
+  </section>
+
+  <section class="mt-3 grid grid-cols-2 gap-3" data-reveal="2">
+    <div class="col-span-2 tile p-5">
+      <div class="flex items-center justify-between">
+        <span class="eyebrow">${esc(me.title)}</span>
+        <span class="font-display text-[13px] text-ink-3 tnum">${fmt(me.xp)} / ${fmt(me.xpNext)} XP</span>
+      </div>
+      <p class="mt-3 font-display text-[40px] font-bold tracking-tighter leading-none"><span class="text-ink-3 text-[18px] mr-1.5">LV</span>${me.level}</p>
+      ${bar('xp-profile', me.xp / me.xpNext, 'mt-4')}
+    </div>
+    ${stat('누적 경험치', fmt(me.totalXp), 'XP', 'bolt-bold')}
+    ${stat('누적 완료', fmt(me.completedCount), '회', 'check-circle-bold')}
+    ${stat('현재 연속', me.streak, '일', 'fire-bold')}
+    ${stat('최고 연속', me.bestStreak, '일', 'cup-star-bold')}
+    ${stat('친구', me.friendCount, '명', 'users-group-rounded-bold')}
+    ${stat('함께한 지', daysSince(me.createdAt), '일째', 'calendar-linear')}
+  </section>
+
+  <section class="mt-8 grid gap-2" data-reveal="3">
+    <button data-act="logout" class="btn-ghost w-full">${icon('logout-2-linear', 'text-[18px]')}로그아웃</button>
+  </section>`;
+}
+
+function authView() {
+  const signup = S.authMode === 'signup';
+  return `${connBanner()}
+  <section class="pt-4" data-reveal="0">
+    <span class="eyebrow">${icon('user-circle-bold', 'text-[13px]')}${signup ? '회원가입' : '로그인'}</span>
+    <h1 class="mt-4 text-[28px] leading-snug font-bold tracking-tight">${signup ? '갓생 캐릭터를<br>만들어 보세요' : '다시 오신 걸<br>환영해요'}</h1>
+    <p class="mt-2 text-ink-2 text-[15px]">${signup ? '가입하면 레벨 1, 갓생 새싹부터 시작해요' : '이어 가던 연속 기록을 지켜 보세요'}</p>
+  </section>
+  <section class="mt-7" data-reveal="1">
+    <div class="bezel"><div class="core p-5">
+      ${seg([['login', '로그인'], ['signup', '회원가입']], S.authMode, 'auth-mode')}
+      <form data-form="auth" class="mt-6 grid gap-4" novalidate>
+        <label class="block"><span class="label">아이디</span>
+          <input name="username" class="field" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" placeholder="영문 소문자·숫자 4–16자"></label>
+        <label class="block"><span class="label">비밀번호</span>
+          <input name="password" type="password" class="field" autocomplete="${signup ? 'new-password' : 'current-password'}" maxlength="64" placeholder="6자 이상"></label>
+        ${signup ? `
+        <label class="block"><span class="label">비밀번호 확인</span>
+          <input name="password2" type="password" class="field" autocomplete="new-password" maxlength="64" placeholder="한 번 더 입력해 주세요"></label>
+        <label class="block"><span class="label">닉네임</span>
+          <input name="nickname" class="field" maxlength="12" autocomplete="nickname" placeholder="친구에게 보이는 이름 (12자까지)"></label>` : ''}
+        <p id="auth-error" class="err !mt-0" hidden></p>
+        <button type="submit" class="btn-primary w-full mt-2">${signup ? '가입하고 시작하기' : '로그인'}<span class="arrow">${icon('arrow-right-linear', 'text-[20px]')}</span></button>
+      </form>
+    </div></div>
+    <p class="mt-5 px-2 text-[12.5px] text-ink-3 leading-relaxed flex gap-1.5">${icon('shield-check-linear', 'text-[15px] mt-0.5')}<span>계정 정보는 이 서버에만 저장돼요. 비밀번호는 암호화해서 보관해요.</span></p>
+  </section>`;
+}
+
+/* ---------------- 설정 ---------------- */
+function viewSettings() {
+  const s = S.settings;
+  const row = (ic, label, desc, control) => `<div class="flex items-center gap-4 px-4 py-4 min-h-[68px]">
+      <span class="cat !w-10 !h-10 !text-[19px]">${icon(ic)}</span>
+      <div class="flex-1 min-w-0"><p class="font-semibold text-[15px]">${label}</p>${desc ? `<p class="text-[12.5px] text-ink-3 mt-0.5 leading-snug">${desc}</p>` : ''}</div>
+      ${control}
+    </div>`;
+  const toggle = (key, label) => `<button type="button" role="switch" aria-checked="${!!s[key]}" aria-label="${label}" data-act="set-toggle" data-key="${key}" class="switch"></button>`;
+  const group = (title, body, i) => `<section class="mt-8" data-reveal="${i}">
+      <h2 class="px-2 text-[13px] font-semibold text-ink-3 mb-2.5">${title}</h2>
+      <div class="bezel sm"><div class="core divide-y divide-line/[0.06]">${body}</div></div>
+    </section>`;
+  const fill = ((s.brightness - 50) / 70) * 100;
+
+  return `
+  <section class="pt-3" data-reveal="0">
+    <h1 class="text-[28px] font-bold tracking-tight">설정</h1>
+    <p class="mt-1 text-ink-2 text-[15px]">이 기기에서 보이는 화면과 플레이 방식을 바꿔요</p>
+  </section>
+
+  ${group('화면', `
+    <div class="px-4 py-4">
+      <div class="flex items-center gap-4">
+        <span class="cat !w-10 !h-10 !text-[19px]">${icon('sun-2-linear')}</span>
+        <div class="flex-1"><p class="font-semibold text-[15px]">화면 밝기</p><p class="text-[12.5px] text-ink-3 mt-0.5">눈이 부시면 낮춰 보세요</p></div>
+        <span id="bright-val" class="font-display font-semibold tnum text-[15px]">${s.brightness}%</span>
+      </div>
+      <input type="range" min="50" max="120" step="5" value="${s.brightness}" data-input="brightness" class="range mt-3" style="--fill:${fill}%" aria-label="화면 밝기">
+      <div class="flex justify-between text-[11px] text-ink-3 font-display -mt-0.5"><span>50%</span><button data-act="bright-reset" class="font-sans font-semibold hover:text-ink">기본값 100%</button><span>120%</span></div>
+    </div>
+    <div class="px-4 py-4">
+      <div class="flex items-center gap-4 mb-3">
+        <span class="cat !w-10 !h-10 !text-[19px]">${icon(s.theme === 'light' ? 'sun-2-linear' : s.theme === 'system' ? 'monitor-linear' : 'moon-linear')}</span>
+        <p class="font-semibold text-[15px]">테마</p>
+      </div>
+      ${seg([['dark', '다크'], ['light', '라이트'], ['system', '시스템']], s.theme, 'set-theme')}
+    </div>
+    <div class="px-4 py-4">
+      <div class="flex items-center gap-4 mb-3">
+        <span class="cat !w-10 !h-10 !text-[19px]">${icon('pallete-2-linear')}</span>
+        <div class="flex-1"><p class="font-semibold text-[15px]">강조 색상</p><p class="text-[12.5px] text-ink-3 mt-0.5">${esc(GS_ACCENTS[s.accent].name)}</p></div>
+      </div>
+      <div class="flex gap-3 px-1">${Object.entries(GS_ACCENTS).map(([k, a]) => `<button data-act="set-accent" data-v="${k}" class="swatch ${s.accent === k ? 'on' : ''}" style="background:rgb(${a.dark})" aria-label="${a.name}" aria-pressed="${s.accent === k}">${s.accent === k ? checkSvg(16) : ''}</button>`).join('')}</div>
+    </div>
+    <div class="px-4 py-4">
+      <div class="flex items-center gap-4 mb-3">
+        <span class="cat !w-10 !h-10 !text-[19px]">${icon('text-field-linear')}</span>
+        <p class="font-semibold text-[15px]">글자 크기</p>
+      </div>
+      ${seg([['sm', '작게'], ['md', '보통'], ['lg', '크게']], s.fontSize, 'set-font')}
+    </div>`, 1)}
+
+  ${group('플레이', `
+    ${row('magic-stick-3-linear', '레벨업 연출', '레벨이 오르면 전체 화면으로 축하해요', toggle('levelUpFx', '레벨업 연출'))}
+    ${row('smartphone-vibration-linear', '진동 피드백', '퀘스트를 끝낼 때 짧게 진동해요 (지원 기기만)', toggle('haptics', '진동 피드백'))}
+    ${row('sort-vertical-linear', '완료한 퀘스트 아래로', '남은 퀘스트가 먼저 보여요', toggle('sortDone', '완료한 퀘스트 아래로'))}
+    ${row('cup-star-bold', '레벨업 연출 미리 보기', '', `<button data-act="preview-levelup" class="btn-ghost !min-h-[40px] !px-4 text-[13px]">보기</button>`)}`, 2)}
+
+  ${group('접근성', `
+    ${row('accessibility-linear', '움직임 줄이기', '등장 효과와 애니메이션을 최소화해요', toggle('reduceMotion', '움직임 줄이기'))}`, 3)}
+
+  ${S.me ? group('계정', `
+    ${row('user-circle-linear', esc(S.me.nickname), `@${esc(S.me.username)} · ${esc(S.me.code)}`, `<button data-act="logout" class="btn-ghost !min-h-[40px] !px-4 text-[13px]">로그아웃</button>`)}
+    ${row('trash-bin-trash-linear', '계정 삭제', '퀘스트와 기록, 친구 관계가 모두 지워져요', `<button data-act="delete-account" class="h-10 px-4 rounded-full text-[13px] font-semibold text-danger bg-danger/10 hover:bg-danger/15">삭제</button>`)}`, 4) : ''}
+
+  ${group('정보', `
+    ${row('info-circle-linear', '버전', '갓생게임 1.0.0', '')}
+    ${row('restart-linear', '설정 초기화', '화면·플레이 설정을 처음 상태로 되돌려요', `<button data-act="reset-settings" class="btn-ghost !min-h-[40px] !px-4 text-[13px]">초기화</button>`)}`, 5)}
+  `;
+}
+
+const VIEWS = { home: viewHome, quests: viewQuests, friends: viewFriends, profile: viewProfile, settings: viewSettings };
+
+/* =========================================================
+   시트 · 확인 · 토스트 · 연출
+   ========================================================= */
+let sheetTimer = null;
+function openSheet(html) {
+  clearTimeout(sheetTimer);
+  const root = $('#sheet-root');
+  root.innerHTML = `<div class="sheet-backdrop" data-act="sheet-close"></div>
+    <div class="sheet" role="dialog" aria-modal="true"><div class="grabber"></div>${html}</div>`;
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => requestAnimationFrame(() => $$('.sheet-backdrop, .sheet', root).forEach((e) => e.classList.add('open'))));
+}
+function closeSheet() {
+  const root = $('#sheet-root');
+  $$('.sheet-backdrop, .sheet', root).forEach((e) => e.classList.remove('open'));
+  document.body.style.overflow = '';
+  S.openFriendId = null;
+  if (S.confirmResolve) { S.confirmResolve(false); S.confirmResolve = null; }
+  sheetTimer = setTimeout(() => { root.innerHTML = ''; }, 500);
+}
+const sheetHead = (title) => `<div class="flex items-center justify-between gap-3">
+    <h2 class="text-[22px] font-bold tracking-tight">${title}</h2>
+    <button type="button" data-act="sheet-close" class="icon-btn" aria-label="닫기">${icon('close-circle-linear', 'text-[22px]')}</button>
+  </div>`;
+
+function confirmDialog({ title, desc, ok = '확인', danger = false }) {
+  return new Promise((resolve) => {
+    openSheet(`<div class="px-6 pt-3 pb-8">
+      <h2 class="text-[21px] font-bold tracking-tight leading-snug">${title}</h2>
+      ${desc ? `<p class="mt-2 text-[14.5px] text-ink-2 leading-relaxed">${desc}</p>` : ''}
+      <div class="mt-7 grid grid-cols-2 gap-2">
+        <button data-act="confirm-no" class="btn-ghost">취소</button>
+        <button data-act="confirm-yes" class="${danger ? 'h-12 rounded-full font-semibold text-white bg-danger hover:scale-[1.02] active:scale-[0.98]' : 'btn-primary center !min-h-[48px]'}">${ok}</button>
+      </div>
+    </div>`);
+    S.confirmResolve = resolve;
+  });
+}
+
+function toast(msg, ic = 'check-circle-bold') {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `${icon(ic)}<span>${esc(msg)}</span>`;
+  $('#toast-root').appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 500); }, 2600);
+}
+
+function xpFloat(text, rect, neg = false) {
+  if (!rect || S.settings.reduceMotion) return;
+  const el = document.createElement('div');
+  el.className = `xp-float ${neg ? 'neg' : ''}`;
+  el.textContent = text;
+  el.style.left = `${rect.right - 48}px`;
+  el.style.top = `${rect.top + rect.height / 2 - 14}px`;
+  $('#fx-root').appendChild(el);
+  setTimeout(() => el.remove(), 1300);
+}
+
+function showLevelUp(level, title) {
+  if (!S.settings.levelUpFx) { toast(`레벨 ${level} 달성! 칭호: ${title}`, 'cup-star-bold'); return; }
+  haptic([20, 60, 30]);
+  const parts = Array.from({ length: 30 }, (_, i) => {
+    const ang = (i / 30) * Math.PI * 2 + Math.random() * 0.3;
+    const dist = 110 + Math.random() * 100;
+    return `<i class="${i % 3 === 0 ? 'sq' : ''}" style="--x:${(Math.cos(ang) * dist).toFixed(1)}px;--y:${(Math.sin(ang) * dist).toFixed(1)}px;--r:${Math.round(Math.random() * 540)}deg;--d:${Math.round(Math.random() * 140)}ms"></i>`;
+  }).join('');
+  const root = $('#fx-root');
+  const wrap = document.createElement('div');
+  wrap.className = 'lvl-overlay';
+  wrap.setAttribute('role', 'dialog');
+  wrap.setAttribute('aria-label', `레벨 ${level} 달성`);
+  wrap.innerHTML = `<div class="lvl-card">
+      <div class="burst" aria-hidden="true">${parts}</div>
+      <p class="font-display text-[13px] tracking-[0.32em] font-bold text-accent-fg">LEVEL UP</p>
+      <div class="lvl-ring mt-6"><div>
+        <p class="font-display text-ink-3 text-[18px] font-semibold leading-none">LV</p>
+        <p class="font-display text-[84px] font-bold tracking-tighter leading-none tnum">${level}</p>
+      </div></div>
+      <span class="eyebrow mt-7">${icon('crown-minimalistic-bold', 'text-[13px]')}${esc(title)}</span>
+      <h2 class="mt-4 text-[24px] font-bold tracking-tight leading-snug">해낸 만큼 성장했어요</h2>
+      <p class="mt-2 text-[14.5px] text-ink-2">이 기세로 오늘의 남은 퀘스트도 끝내 보세요</p>
+      <button data-act="levelup-close" class="btn-primary center w-full mt-8">계속하기</button>
+    </div>`;
+  root.appendChild(wrap);
+  requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
+}
+
+/* ---------------- 퀘스트 시트 ---------------- */
+function openQuestSheet(mode, quest, preset) {
+  const base = quest || preset || {};
+  const type = base.type || S.questTab;
+  S.form = {
+    mode, id: quest ? quest.id : null, type,
+    difficulty: base.difficulty || 'normal',
+    category: base.category || 'health',
+    target: type === 'weekly' ? (base.target || 3) : 3,
+  };
+  const title = base.title || '';
+  openSheet(`<form data-form="quest" class="px-6 pt-3 pb-8" novalidate>
+      ${sheetHead(mode === 'edit' ? '퀘스트 수정' : '새 퀘스트')}
+      <label class="block mt-6"><span class="label">퀘스트 이름</span>
+        <span class="relative block">
+          <input name="title" data-input="quest-title" class="field pr-16" maxlength="40" placeholder="예: 물 2리터 마시기" value="${esc(title)}" autocomplete="off">
+          <span id="qf-count" class="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3 font-display tnum">${[...title].length}/40</span>
+        </span>
+      </label>
+      <div id="qf-options"></div>
+      <p id="qf-error" class="err" hidden></p>
+      <button type="submit" class="btn-primary w-full mt-8">${mode === 'edit' ? '저장하기' : '퀘스트 추가하기'}<span class="arrow">${icon(mode === 'edit' ? 'check-circle-bold' : 'add-circle-linear', 'text-[20px]')}</span></button>
+      ${mode === 'edit' ? `<button type="button" data-act="quest-delete" class="w-full h-12 mt-2 rounded-full text-[14px] font-semibold text-danger hover:bg-danger/10">퀘스트 삭제</button>` : ''}
+    </form>`);
+  renderQuestOptions();
+}
+
+function renderQuestOptions() {
+  const f = S.form;
+  const el = $('#qf-options');
+  if (!el || !f) return;
+  el.innerHTML = `
+    <div class="mt-6"><span class="label">종류</span>
+      ${seg([['daily', '일일 퀘스트'], ['weekly', '주간 퀘스트']], f.type, 'qf-type', f.mode === 'edit')}
+      <p class="hint">${f.mode === 'edit' ? '종류는 만든 뒤에 바꿀 수 없어요' : f.type === 'daily' ? '매일 0시에 다시 도전할 수 있어요' : '매주 월요일 0시에 진행이 초기화돼요'}</p>
+    </div>
+    <div class="mt-6"><span class="label">난이도 · 보상</span>
+      <div class="grid grid-cols-3 gap-2">${Object.keys(DIFF).map((d) => `
+        <button type="button" data-act="qf-diff" data-v="${d}" class="opt ${f.difficulty === d ? 'on' : ''}" aria-pressed="${f.difficulty === d}">
+          <span class="font-semibold text-[15px]">${DIFF[d]}</span>
+          <span class="font-display text-[13px] font-semibold tnum">+${XP[f.type][d]} XP</span>
+        </button>`).join('')}</div>
+    </div>
+    <div class="mt-6"><span class="label">카테고리</span>
+      <div class="grid grid-cols-5 gap-2">${Object.entries(CATEGORY).map(([k, c]) => `
+        <button type="button" data-act="qf-cat" data-v="${k}" class="opt ${f.category === k ? 'on' : ''}" aria-pressed="${f.category === k}">
+          ${icon(c.icon, 'text-[22px]')}<span class="text-[12px] font-semibold">${c.label}</span>
+        </button>`).join('')}</div>
+    </div>
+    ${f.type === 'weekly' ? `<div class="mt-6"><span class="label">이번 주 목표 횟수</span>
+      <div class="flex items-center justify-between rounded-[1.3rem] bg-line/[0.05] p-2" style="box-shadow:inset 0 0 0 1px rgb(var(--line) / .06)">
+        <button type="button" data-act="qf-target" data-v="-1" class="step" aria-label="목표 횟수 줄이기" ${f.target <= 1 ? 'disabled' : ''}>−</button>
+        <p class="font-display text-[24px] font-bold tnum"><span class="font-sans text-[16px] text-ink-3 font-semibold mr-1">주</span>${f.target}<span class="font-sans text-[16px] text-ink-3 font-semibold ml-1">회</span></p>
+        <button type="button" data-act="qf-target" data-v="1" class="step" aria-label="목표 횟수 늘리기" ${f.target >= 7 ? 'disabled' : ''}>+</button>
+      </div></div>` : ''}`;
+}
+
+/* ---------------- 친구 시트 ---------------- */
+function friendSheetBody(f) {
+  const since = f.since ? daysSince(f.since) : 1;
+  return `${sheetHead('친구 프로필')}
+    <div class="mt-5 flex items-center gap-4">
+      ${avatar(f.nickname, 64)}
+      <div class="min-w-0">
+        <p class="text-[21px] font-bold tracking-tight truncate">${esc(f.nickname)}</p>
+        <p class="font-display text-[13px] text-ink-3 tracking-[0.04em]">${esc(f.code)} · 친구가 된 지 ${since}일째</p>
+      </div>
+    </div>
+    ${f.bio ? `<p class="mt-4 text-[14.5px] text-ink-2 leading-relaxed">${esc(f.bio)}</p>` : ''}
+    <div class="mt-5 tile p-5">
+      <div class="flex items-center justify-between">
+        <span class="eyebrow">${esc(f.title)}</span>
+        <span class="font-display text-[13px] text-ink-3 tnum">${fmt(f.totalXp)} XP</span>
+      </div>
+      <p class="mt-3 font-display text-[40px] font-bold tracking-tighter leading-none"><span class="text-ink-3 text-[18px] mr-1.5">LV</span>${f.level}</p>
+      <div class="bar mt-4"><i style="--p:${(f.xp / f.xpNext).toFixed(3)}"></i></div>
+      <p class="mt-2 text-[12.5px] text-ink-3">다음 레벨까지 ${fmt(f.xpNext - f.xp)} XP</p>
+    </div>
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      ${stat('현재 연속', f.streak, '일', 'fire-bold')}
+      ${stat('최고 연속', f.bestStreak, '일', 'cup-star-bold')}
+      ${stat('오늘 일일 퀘스트', `${f.today.done}/${f.today.total}`, '', 'checklist-minimalistic-linear')}
+      ${stat('누적 완료', fmt(f.completedCount), '회', 'check-circle-bold')}
+    </div>
+    <div class="mt-3">${weekStrip(f.week.days, '이번 주 올클리어')}</div>
+    <div class="mt-6 grid gap-2">
+      ${f.cheeredToday
+        ? `<button class="btn-ghost w-full" disabled>${icon('hand-heart-bold', 'text-[18px]')}오늘 응원을 보냈어요</button>`
+        : `<button data-act="cheer" data-id="${f.id}" class="btn-primary w-full">응원 보내기<span class="arrow">${icon('hand-heart-bold', 'text-[20px]')}</span></button>`}
+      <button data-act="friend-remove" data-id="${f.id}" class="h-12 rounded-full text-[14px] font-semibold text-ink-3 hover:text-danger">친구 삭제</button>
+    </div>`;
+}
+
+async function openFriendSheet(id) {
+  const cached = S.friends && S.friends.friends.find((f) => f.id === id);
+  if (!cached) return;
+  openSheet(`<div id="friend-sheet" class="px-6 pt-3 pb-8">${friendSheetBody(cached)}</div>`);
+  S.openFriendId = id;
+  try {
+    const { friend } = await api(`/friends/${id}`);
+    updateFriendCache(friend);
+    if (S.openFriendId === id && $('#friend-sheet')) $('#friend-sheet').innerHTML = friendSheetBody(friend);
+  } catch (e) { toast(e.message, 'danger-triangle-linear'); }
+}
+function updateFriendCache(friend) {
+  if (!S.friends) return;
+  S.friends.friends = S.friends.friends.map((f) => (f.id === friend.id ? friend : f));
+}
+
+/* =========================================================
+   동작
+   ========================================================= */
+async function progress(id, delta, el) {
+  if (S.busy[id]) return;
+  S.busy[id] = true;
+  const rect = el ? el.getBoundingClientRect() : null;
+  try {
+    const d = await api(`/quests/${id}/progress`, { method: 'POST', body: { delta } });
+    if (d.leveledUp) S.bars.xp = 0;
+    setState(d);
+    render();
+    if (d.gained > 0) { haptic(); xpFloat(`+${d.gained} XP`, rect); }
+    else if (d.gained < 0) xpFloat(`${d.gained} XP`, rect, true);
+    if (d.perfect) toast(`오늘 퀘스트 올클리어! 보너스 +${PERFECT_BONUS} XP`, 'fire-bold');
+    if (d.leveledUp) setTimeout(() => showLevelUp(d.leveledUp, S.me.title), 350);
+  } catch (e) {
+    toast(e.message, 'danger-triangle-linear');
+  } finally {
+    delete S.busy[id];
+  }
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) { /* 아래 방식으로 다시 시도 */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+function saveSettings(patch, rerender = true) {
+  S.settings = { ...S.settings, ...patch };
+  gsSaveSettings(S.settings);
+  gsApplySettings(S.settings);
+  if (rerender) render();
+}
+
+function showErr(sel, msg) {
+  const el = $(sel);
+  if (!el) { toast(msg, 'danger-triangle-linear'); return; }
+  el.innerHTML = `${icon('danger-triangle-linear', 'text-[16px] mt-0.5')}<span>${esc(msg)}</span>`;
+  el.hidden = false;
+}
+
+async function withBusy(btn, fn) {
+  if (!btn || btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  btn.disabled = true;
+  try { await fn(); } finally { btn.disabled = false; delete btn.dataset.busy; }
+}
+
+document.addEventListener('click', async (e) => {
+  const tabLink = e.target.closest('[data-tab-link]');
+  if (tabLink && tabLink.dataset.tabLink === currentTab() && location.hash) {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: S.settings.reduceMotion ? 'auto' : 'smooth' });
+    return;
+  }
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const act = el.dataset.act;
+  const id = el.dataset.id;
+  const v = el.dataset.v;
+
+  switch (act) {
+    case 'go': go(el.dataset.tab); break;
+    case 'start-signup': S.authMode = 'signup'; go('profile'); break;
+    case 'auth-mode': S.authMode = v; render(); break;
+    case 'retry': await refreshMe(); if (S.me) loadFriends(); render(); break;
+
+    case 'toggle': {
+      const q = S.quests.find((x) => x.id === id);
+      if (q) progress(id, q.done ? -1 : 1, el);
+      break;
+    }
+    case 'wk-plus': progress(id, 1, el); break;
+    case 'wk-minus': progress(id, -1, el); break;
+    case 'manage':
+      S.questTab = v;
+      go('quests');
+      if (el.dataset.new) setTimeout(() => openQuestSheet('new'), 250);
+      break;
+    case 'quest-tab': S.questTab = v; render(); break;
+    case 'quest-new': openQuestSheet('new'); break;
+    case 'preset': openQuestSheet('new', null, PRESETS[Number(el.dataset.i)]); break;
+    case 'quest-edit': openQuestSheet('edit', S.quests.find((x) => x.id === id)); break;
+    case 'qf-type': if (S.form && S.form.mode === 'new') { S.form.type = v; renderQuestOptions(); } break;
+    case 'qf-diff': if (S.form) { S.form.difficulty = v; renderQuestOptions(); } break;
+    case 'qf-cat': if (S.form) { S.form.category = v; renderQuestOptions(); } break;
+    case 'qf-target': if (S.form) { S.form.target = Math.max(1, Math.min(7, S.form.target + Number(v))); renderQuestOptions(); } break;
+    case 'quest-delete': {
+      const qid = S.form && S.form.id;
+      const q = S.quests.find((x) => x.id === qid);
+      if (!q) break;
+      const ok = await confirmDialog({ title: `‘${esc(q.title)}’ 퀘스트를 삭제할까요?`, desc: '이미 받은 경험치와 연속 기록은 그대로 남아요.', ok: '삭제', danger: true });
+      if (!ok) break;
+      try {
+        const d = await api(`/quests/${qid}`, { method: 'DELETE' });
+        setState(d); S.confirmResolve = null; closeSheet(); render(); toast('퀘스트를 삭제했어요', 'trash-bin-trash-linear');
+        if (d.perfect) toast(`남은 퀘스트를 모두 끝냈어요! 보너스 +${PERFECT_BONUS} XP`, 'fire-bold');
+      } catch (err) { toast(err.message, 'danger-triangle-linear'); }
+      break;
+    }
+
+    case 'sheet-close': closeSheet(); break;
+    case 'confirm-yes': if (S.confirmResolve) { const r = S.confirmResolve; S.confirmResolve = null; r(true); } break;
+    case 'confirm-no': closeSheet(); break;
+
+    case 'friend-tab': S.friendTab = v; render(); break;
+    case 'friend-open': openFriendSheet(id); break;
+    case 'req-accept':
+    case 'req-decline':
+    case 'req-cancel':
+      await withBusy(el, async () => {
+        try {
+          const path = act === 'req-cancel' ? `/friends/requests/${id}` : `/friends/requests/${id}/${act === 'req-accept' ? 'accept' : 'decline'}`;
+          const d = await api(path, { method: act === 'req-cancel' ? 'DELETE' : 'POST' });
+          S.friends = d; S.incomingCount = d.incoming.length; setState({ me: d.me });
+          render();
+          toast(act === 'req-accept' ? `${d.nickname}님과 친구가 되었어요` : act === 'req-decline' ? '요청을 거절했어요' : '요청을 취소했어요',
+            act === 'req-accept' ? 'users-group-rounded-bold' : 'check-circle-bold');
+        } catch (err) { toast(err.message, 'danger-triangle-linear'); loadFriends(); }
+      });
+      break;
+    case 'cheer':
+      await withBusy(el, async () => {
+        try {
+          const { friend } = await api(`/friends/${id}/cheer`, { method: 'POST' });
+          updateFriendCache(friend);
+          if ($('#friend-sheet')) $('#friend-sheet').innerHTML = friendSheetBody(friend);
+          haptic();
+          toast(`${friend.nickname}님에게 응원을 보냈어요`, 'hand-heart-bold');
+        } catch (err) { toast(err.message, 'danger-triangle-linear'); }
+      });
+      break;
+    case 'friend-remove': {
+      const f = S.friends && S.friends.friends.find((x) => x.id === id);
+      if (!f) break;
+      const ok = await confirmDialog({ title: `${esc(f.nickname)}님을 친구에서 삭제할까요?`, desc: '상대의 친구 목록에서도 사라져요. 다시 친구가 되려면 요청을 새로 보내야 해요.', ok: '삭제', danger: true });
+      if (!ok) break;
+      try {
+        const d = await api(`/friends/${id}`, { method: 'DELETE' });
+        S.friends = d; S.incomingCount = d.incoming.length; setState({ me: d.me });
+        S.confirmResolve = null; closeSheet(); render(); toast('친구를 삭제했어요', 'check-circle-bold');
+      } catch (err) { toast(err.message, 'danger-triangle-linear'); }
+      break;
+    }
+    case 'copy-code': {
+      const code = S.me && S.me.code;
+      if (!code) break;
+      toast((await copyText(code)) ? `고유 ID ${code}를 복사했어요` : `복사하지 못했어요. ${code}를 직접 알려 주세요`, 'copy-linear');
+      break;
+    }
+    case 'share-code': {
+      const code = S.me && S.me.code;
+      if (!code) break;
+      const text = `갓생게임에서 같이 갓생 살아요! 친구 추가 탭에 제 고유 ID ${code}를 입력해 주세요.`;
+      if (navigator.share) {
+        try { await navigator.share({ title: '갓생게임 친구 초대', text, url: location.origin }); } catch (err) { /* 공유 창을 닫음 */ }
+      } else {
+        toast((await copyText(`${text} ${location.origin}`)) ? '초대 메시지를 복사했어요' : '이 브라우저에서는 공유할 수 없어요', 'share-linear');
+      }
+      break;
+    }
+
+    case 'profile-edit':
+      openSheet(`<form data-form="profile" class="px-6 pt-3 pb-8" novalidate>
+        ${sheetHead('프로필 수정')}
+        <label class="block mt-6"><span class="label">닉네임</span>
+          <input name="nickname" class="field" maxlength="12" value="${esc(S.me.nickname)}" autocomplete="nickname"></label>
+        <label class="block mt-4"><span class="label">한 줄 소개</span>
+          <input name="bio" class="field" maxlength="40" value="${esc(S.me.bio)}" placeholder="예: 매일 아침 6시 기상 도전 중" autocomplete="off"></label>
+        <p class="hint">친구에게 보이는 정보예요</p>
+        <p id="profile-error" class="err" hidden></p>
+        <button type="submit" class="btn-primary w-full mt-7">저장하기<span class="arrow">${icon('check-circle-bold', 'text-[20px]')}</span></button>
+      </form>`);
+      break;
+    case 'logout': {
+      const ok = await confirmDialog({ title: '로그아웃할까요?', desc: '기록은 서버에 그대로 남아 있어요. 언제든 다시 로그인하면 이어서 할 수 있어요.', ok: '로그아웃' });
+      if (!ok) break;
+      S.confirmResolve = null; closeSheet();
+      try { await api('/auth/logout', { method: 'POST' }); } catch (err) { /* 이미 만료된 세션 */ }
+      clearSession(); S.authMode = 'login'; go('home'); render(); toast('로그아웃했어요', 'logout-2-linear');
+      break;
+    }
+    case 'delete-account':
+      openSheet(`<form data-form="delete-account" class="px-6 pt-3 pb-8" novalidate>
+        ${sheetHead('계정 삭제')}
+        <p class="mt-3 text-[14.5px] text-ink-2 leading-relaxed">레벨, 경험치, 퀘스트, 연속 기록, 친구 관계가 모두 지워지고 되돌릴 수 없어요. 계속하려면 비밀번호를 입력해 주세요.</p>
+        <label class="block mt-6"><span class="label">비밀번호</span>
+          <input name="password" type="password" class="field" autocomplete="current-password"></label>
+        <p id="delete-error" class="err" hidden></p>
+        <button type="submit" class="w-full h-14 mt-7 rounded-full font-bold text-white bg-danger hover:scale-[1.02] active:scale-[0.98]">계정 영구 삭제</button>
+      </form>`);
+      break;
+
+    case 'set-theme': saveSettings({ theme: v }); break;
+    case 'set-accent': saveSettings({ accent: v }); break;
+    case 'set-font': saveSettings({ fontSize: v }); break;
+    case 'set-toggle': saveSettings({ [el.dataset.key]: !S.settings[el.dataset.key] }); break;
+    case 'bright-reset': saveSettings({ brightness: 100 }); break;
+    case 'reset-settings': {
+      const ok = await confirmDialog({ title: '설정을 처음 상태로 되돌릴까요?', desc: '계정과 퀘스트 기록은 바뀌지 않아요.', ok: '초기화' });
+      if (!ok) break;
+      S.confirmResolve = null; closeSheet();
+      saveSettings({ ...GS_DEFAULTS });
+      toast('설정을 초기화했어요', 'restart-linear');
+      break;
+    }
+    case 'preview-levelup': showLevelUp(S.me ? S.me.level + 1 : 5, S.me ? S.me.title : '루틴 수련생'); break;
+    case 'levelup-close': {
+      const ov = el.closest('.lvl-overlay');
+      if (ov) { ov.classList.remove('open'); setTimeout(() => ov.remove(), 500); }
+      break;
+    }
+    default: break;
+  }
+});
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.dataset.input === 'brightness') {
+    const val = Number(t.value);
+    t.style.setProperty('--fill', `${((val - 50) / 70) * 100}%`);
+    const label = $('#bright-val');
+    if (label) label.textContent = `${val}%`;
+    saveSettings({ brightness: val }, false);
+  } else if (t.dataset.input === 'quest-title') {
+    const c = $('#qf-count');
+    if (c) c.textContent = `${[...t.value].length}/40`;
+  }
+});
+
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('form[data-form]');
+  if (!form) return;
+  e.preventDefault();
+  const btn = form.querySelector('[type="submit"]');
+  const kind = form.dataset.form;
+
+  await withBusy(btn, async () => {
+    try {
+      if (kind === 'auth') {
+        const signup = S.authMode === 'signup';
+        const username = form.username.value.trim();
+        const password = form.password.value;
+        if (!username || !password) return showErr('#auth-error', '아이디와 비밀번호를 입력해 주세요');
+        const body = { username, password };
+        if (signup) {
+          if (password !== form.password2.value) return showErr('#auth-error', '비밀번호가 서로 달라요. 다시 확인해 주세요');
+          body.nickname = form.nickname.value.trim();
+          if (!body.nickname) return showErr('#auth-error', '닉네임을 입력해 주세요');
+        }
+        const d = await api(`/auth/${signup ? 'signup' : 'login'}`, { method: 'POST', body });
+        setState(d); S.netError = null;
+        loadFriends();
+        if (signup) { S.questTab = 'daily'; go('quests'); toast(`${d.me.nickname}님, 환영해요! 첫 퀘스트를 골라 보세요`, 'star-shine-bold'); }
+        else { go('home'); toast(`${d.me.nickname}님, 다시 만나서 반가워요`, 'hand-heart-bold'); }
+      } else if (kind === 'quest') {
+        const f = S.form;
+        const title = form.title.value.trim();
+        if (!title) return showErr('#qf-error', '퀘스트 이름을 입력해 주세요');
+        const body = { title, difficulty: f.difficulty, category: f.category, target: f.type === 'weekly' ? f.target : 1 };
+        let d;
+        if (f.mode === 'edit') d = await api(`/quests/${f.id}`, { method: 'PATCH', body });
+        else d = await api('/quests', { method: 'POST', body: { ...body, type: f.type } });
+        setState(d); S.questTab = f.type; closeSheet(); render();
+        toast(f.mode === 'edit' ? '퀘스트를 저장했어요' : '퀘스트를 추가했어요. 홈에서 체크해 보세요', 'check-circle-bold');
+      } else if (kind === 'friend-add') {
+        const code = form.code.value.trim();
+        if (!code) return showErr('#friend-error', '친구의 고유 ID를 입력해 주세요');
+        const d = await api('/friends/requests', { method: 'POST', body: { code } });
+        S.friends = d; S.incomingCount = d.incoming.length; setState({ me: d.me });
+        render();
+        toast(d.result === 'accepted' ? `${d.nickname}님도 요청을 보냈었네요. 바로 친구가 되었어요` : `${d.nickname}님에게 친구 요청을 보냈어요`,
+          d.result === 'accepted' ? 'users-group-rounded-bold' : 'check-circle-bold');
+      } else if (kind === 'profile') {
+        const nickname = form.nickname.value.trim();
+        if (!nickname) return showErr('#profile-error', '닉네임을 입력해 주세요');
+        const d = await api('/me', { method: 'PATCH', body: { nickname, bio: form.bio.value.trim() } });
+        setState(d); closeSheet(); render(); toast('프로필을 저장했어요', 'check-circle-bold');
+      } else if (kind === 'delete-account') {
+        const password = form.password.value;
+        if (!password) return showErr('#delete-error', '비밀번호를 입력해 주세요');
+        await api('/me', { method: 'DELETE', body: { password } });
+        clearSession(); closeSheet(); S.authMode = 'signup'; go('home'); render(); toast('계정을 삭제했어요. 그동안 고마웠어요', 'check-circle-bold');
+      }
+    } catch (err) {
+      const target = { auth: '#auth-error', quest: '#qf-error', 'friend-add': '#friend-error', profile: '#profile-error', 'delete-account': '#delete-error' }[kind];
+      showErr(target, err.message);
+    }
+  });
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const ov = $('.lvl-overlay.open');
+  if (ov) { ov.classList.remove('open'); setTimeout(() => ov.remove(), 500); return; }
+  if ($('.sheet.open')) closeSheet();
+});
+
+window.addEventListener('hashchange', () => {
+  closeSheet();
+  S.animate = true;
+  S.bars = {};
+  render();
+  window.scrollTo({ top: 0 });
+  if (currentTab() === 'friends') loadFriends();
+});
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !S.token) return;
+  await refreshMe();
+  if (!$('.sheet.open')) render();
+  loadFriends();
+});
+
+if (window.matchMedia) {
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (S.settings.theme === 'system') { gsApplySettings(S.settings); render(); }
+  });
+}
+
+setInterval(() => {
+  if (document.visibilityState === 'visible' && S.me && currentTab() === 'friends' && !$('.sheet.open')) loadFriends();
+}, 45000);
+
+/* =========================================================
+   시작
+   ========================================================= */
+(async function boot() {
+  render();
+  if (location.protocol !== 'file:' && S.token) {
+    await refreshMe();
+  }
+  S.ready = true;
+  S.animate = true;
+  render();
+  if (S.me) loadFriends();
+})();
+</script>
+</body>
+</html>

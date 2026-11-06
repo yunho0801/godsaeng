@@ -1,0 +1,14 @@
+{
+  "name": "갓생게임",
+  "short_name": "갓생게임",
+  "description": "할 일을 끝낼 때마다 레벨이 오르는 투두 게임",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
