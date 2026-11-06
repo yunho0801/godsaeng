@@ -78,9 +78,10 @@ const periodKey = (type) => (type === 'daily' ? dayKey() : weekKey());
 const emptyDb = () => ({ users: {}, sessions: {}, quests: {}, requests: {} });
 let db = emptyDb();
 
+// 새 형식 키(sb_secret_…)는 apikey 헤더만 쓰고, 예전 service_role 키(JWT)는 Authorization 헤더도 함께 보냅니다.
 const supabaseHeaders = () => ({
   apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
+  ...(SUPABASE_KEY.startsWith('sb_') ? {} : { Authorization: `Bearer ${SUPABASE_KEY}` }),
   'Content-Type': 'application/json',
 });
 

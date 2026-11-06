@@ -22,7 +22,7 @@ node server.js
 2. 왼쪽 **SQL Editor**에 `supabase/schema.sql` 내용을 붙여 넣고 **Run**을 누르세요.
 3. **Project Settings > API**에서 두 값을 복사해 두세요.
    - Project URL → `SUPABASE_URL`
-   - `service_role` 키 (secret) → `SUPABASE_SERVICE_KEY`
+   - **API Keys** 메뉴의 Secret key (`sb_secret_…`) 또는 Legacy 탭의 `service_role` 키 → `SUPABASE_SERVICE_KEY`
    - service_role 키는 비밀번호와 같아요. 코드나 채팅에 붙여 넣지 말고 Render 설정 화면에만 넣으세요.
 
 ### 2. GitHub — 코드 올리기
